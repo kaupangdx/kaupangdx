@@ -1,41 +1,100 @@
 import {
   RuntimeModule,
-  runtimeModule,
-  state,
   runtimeMethod,
+  state,
+  runtimeModule,
 } from "@proto-kit/module";
 
-import { State, StateMap, assert } from "@proto-kit/protocol";
-import { PublicKey, UInt64 } from "snarkyjs";
+import { StateMap, assert } from "@proto-kit/protocol";
 
-interface BalancesConfig {
-  totalSupply: UInt64;
+import { Field, Provable, PublicKey, Struct, UInt64 } from "snarkyjs";
+
+export const errors = {
+  senderNotFrom: () => "Sender does not match 'from'",
+  fromBalanceInsufficient: () => "From balance is insufficient",
+};
+
+export class TokenId extends Field {}
+export class BalancesKey extends Struct({
+  tokenId: TokenId,
+  address: PublicKey,
+}) {
+  public static from(value: { tokenId: TokenId; address: PublicKey }) {
+    return new BalancesKey(value);
+  }
 }
 
+export class Balance extends UInt64 {}
+
 @runtimeModule()
-export class Balances extends RuntimeModule<BalancesConfig> {
-  @state() public balances = StateMap.from<PublicKey, UInt64>(
-    PublicKey,
-    UInt64
+export class Balances extends RuntimeModule<unknown> {
+  @state() public balances = StateMap.from<BalancesKey, Balance>(
+    BalancesKey,
+    Balance
   );
 
-  @state() public circulatingSupply = State.from<UInt64>(UInt64);
+  public getBalance(tokenId: TokenId, address: PublicKey): Balance {
+    const key = new BalancesKey({ tokenId, address });
+    const balanceOption = this.balances.get(key);
 
-  @runtimeMethod()
-  public setBalance(address: PublicKey, amount: UInt64) {
-    const circulatingSupply = this.circulatingSupply.get();
-    const newCirculatingSupply = circulatingSupply.value.add(amount);
+    return Provable.if(
+      balanceOption.isSome,
+      Balance,
+      balanceOption.value,
+      Balance.from(0)
+    );
+  }
 
-    assert(
-      newCirculatingSupply.lessThanOrEqual(this.config.totalSupply),
-      "Circulating supply would be higher than total supply"
+  public setBalance(tokenId: TokenId, address: PublicKey, amount: Balance) {
+    const key = new BalancesKey({ tokenId, address });
+    this.balances.set(key, amount);
+  }
+
+  public transfer(
+    tokenId: TokenId,
+    from: PublicKey,
+    to: PublicKey,
+    amount: Balance
+  ) {
+    const fromBalance = this.getBalance(tokenId, from);
+    const toBalance = this.getBalance(tokenId, to);
+
+    const fromBalanceIsSufficient = fromBalance.greaterThanOrEqual(amount);
+
+    assert(fromBalanceIsSufficient, errors.fromBalanceInsufficient());
+
+    // used to prevent field underflow during subtraction
+    const paddedFrombalance = fromBalance.add(amount);
+    const safeFromBalance = Provable.if(
+      fromBalanceIsSufficient,
+      Balance,
+      fromBalance,
+      paddedFrombalance
     );
 
-    this.circulatingSupply.set(newCirculatingSupply);
+    const newFromBalance = safeFromBalance.sub(amount);
+    const newToBalance = toBalance.add(amount);
 
-    const currentBalance = this.balances.get(address);
-    const newBalance = currentBalance.value.add(amount);
+    this.setBalance(tokenId, from, newFromBalance);
+    this.setBalance(tokenId, to, newToBalance);
+  }
 
-    this.balances.set(address, newBalance);
+  @runtimeMethod()
+  public mint(tokenId: TokenId, address: PublicKey, amount: Balance) {
+    const balance = this.getBalance(tokenId, address);
+    const newBalance = balance.add(amount);
+    this.setBalance(tokenId, address, newBalance);
+  }
+
+  @runtimeMethod()
+  public transferSigned(
+    tokenId: TokenId,
+    from: PublicKey,
+    to: PublicKey,
+    amount: Balance
+  ) {
+    assert(this.transaction.sender.equals(from), errors.senderNotFrom());
+
+    this.transfer(tokenId, from, to, amount);
   }
 }
