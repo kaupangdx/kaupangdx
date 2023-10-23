@@ -6,10 +6,21 @@ import { log } from "@proto-kit/common";
 log.setLevel("ERROR");
 
 describe("Balances", () => {
-  it("should demonstrate how balances work", async () => {
+  let appChain: TestingAppChain<{
+    Balances: typeof Balances;
+  }>;
+  let balances: Balances;
+
+  const alicePrivateKey = PrivateKey.random();
+  const alice = alicePrivateKey.toPublicKey();
+  const bobPrivateKey = PrivateKey.random();
+  const bob = bobPrivateKey.toPublicKey();
+  const tokenId = TokenId.from(0);
+
+  beforeAll(async () => {
     const totalSupply = UInt64.from(10_000);
 
-    const appChain = TestingAppChain.fromRuntime({
+    appChain = TestingAppChain.fromRuntime({
       modules: {
         Balances,
       },
@@ -22,31 +33,61 @@ describe("Balances", () => {
 
     await appChain.start();
 
-    const alicePrivateKey = PrivateKey.random();
-    const alice = alicePrivateKey.toPublicKey();
-    const tokenId = TokenId.from(0);
-
     appChain.setSigner(alicePrivateKey);
+    balances = appChain.runtime.resolve("Balances");
+  });
 
-    const balances = appChain.runtime.resolve("Balances");
+  describe("mint", () => {
+    it("should mint a balance for alice", async () => {
+      const tx = appChain.transaction(alice, () => {
+        balances.mint(tokenId, alice, UInt64.from(1000));
+      });
 
-    const tx1 = appChain.transaction(alice, () => {
-      balances.mint(tokenId, alice, UInt64.from(1000));
+      await tx.sign();
+      await tx.send();
+
+      const block = await appChain.produceBlock();
+
+      const aliceBalance = await appChain.query.runtime.Balances.balances.get(
+        BalancesKey.from({
+          tokenId,
+          address: alice,
+        })
+      );
+
+      expect(block?.txs[0].status, block?.txs[0].statusMessage).toBe(true);
+      expect(aliceBalance?.toBigInt()).toBe(1000n);
     });
+  });
 
-    await tx1.sign();
-    await tx1.send();
+  describe("transferSigned", () => {
+    it("should mint a balance for alice", async () => {
+      const tx = appChain.transaction(alice, () => {
+        balances.transferSigned(tokenId, alice, bob, UInt64.from(500));
+      });
 
-    const block1 = await appChain.produceBlock();
+      await tx.sign();
+      await tx.send();
 
-    const aliceBalance = await appChain.query.runtime.Balances.balances.get(
-      BalancesKey.from({
-        tokenId,
-        address: alice,
-      })
-    );
+      const block = await appChain.produceBlock();
 
-    expect(block1?.txs[0].status, block1?.txs[0].statusMessage).toBe(true);
-    expect(aliceBalance?.toBigInt()).toBe(1000n);
+      const aliceBalance = await appChain.query.runtime.Balances.balances.get(
+        BalancesKey.from({
+          tokenId,
+          address: alice,
+        })
+      );
+
+      const bobBalance = await appChain.query.runtime.Balances.balances.get(
+        BalancesKey.from({
+          tokenId,
+          address: bob,
+        })
+      );
+
+      expect(block?.txs[0].status, block?.txs[0].statusMessage).toBe(true);
+      expect(aliceBalance?.toBigInt()).toBe(500n);
+      expect(bobBalance?.toBigInt()).toBe(500n);
+    });
   });
 });
