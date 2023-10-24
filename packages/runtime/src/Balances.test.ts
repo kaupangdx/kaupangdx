@@ -1,4 +1,4 @@
-import { TestingAppChain } from "@proto-kit/sdk";
+import { InMemorySigner, TestingAppChain } from "@proto-kit/sdk";
 import { PrivateKey, UInt64 } from "snarkyjs";
 import { Balances, BalancesKey, TokenId } from "./Balances";
 import { log } from "@proto-kit/common";
@@ -61,7 +61,7 @@ describe("Balances", () => {
   });
 
   describe("transferSigned", () => {
-    it("should mint a balance for alice", async () => {
+    it("should transfer a balance from alice to bob", async () => {
       const tx = appChain.transaction(alice, () => {
         balances.transferSigned(tokenId, alice, bob, UInt64.from(500));
       });
@@ -88,6 +88,22 @@ describe("Balances", () => {
       expect(block?.txs[0].status, block?.txs[0].statusMessage).toBe(true);
       expect(aliceBalance?.toBigInt()).toBe(500n);
       expect(bobBalance?.toBigInt()).toBe(500n);
+    });
+
+    it("should not transfer a balance from alice to bob, if the transaction is not signed properly", async () => {
+      const tx = appChain.transaction(alice, () => {
+        balances.transferSigned(tokenId, alice, bob, UInt64.from(500));
+      });
+
+      const inMemorySigner = appChain.resolveOrFail("Signer", InMemorySigner);
+      inMemorySigner.config.signer = bobPrivateKey;
+
+      await tx.sign();
+      await tx.send();
+
+      expect(async () => {
+        await appChain.produceBlock();
+      }).rejects.toThrow(/create a block with zero transactions/);
     });
   });
 });
