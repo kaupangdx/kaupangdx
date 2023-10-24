@@ -2,12 +2,14 @@ import { InMemorySigner, TestingAppChain } from "@proto-kit/sdk";
 import { PrivateKey, UInt64 } from "snarkyjs";
 import { Balances, BalancesKey, TokenId } from "./Balances";
 import { log } from "@proto-kit/common";
+import { Admin } from "./Admin";
 
 log.setLevel("ERROR");
 
 describe("Balances", () => {
   let appChain: TestingAppChain<{
     Balances: typeof Balances;
+    Admin: typeof Admin;
   }>;
   let balances: Balances;
 
@@ -18,16 +20,14 @@ describe("Balances", () => {
   const tokenId = TokenId.from(0);
 
   beforeAll(async () => {
-    const totalSupply = UInt64.from(10_000);
-
     appChain = TestingAppChain.fromRuntime({
       modules: {
         Balances,
+        Admin,
       },
       config: {
-        Balances: {
-          totalSupply,
-        },
+        Balances: {},
+        Admin: {},
       },
     });
 
