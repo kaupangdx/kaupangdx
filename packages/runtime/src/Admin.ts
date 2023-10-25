@@ -1,22 +1,26 @@
 import { RuntimeModule, runtimeMethod, state } from "@proto-kit/module";
-import { State, assert } from "@proto-kit/protocol";
-import { PublicKey } from "snarkyjs";
+import { Option, State, assert } from "@proto-kit/protocol";
+import { Bool, PublicKey } from "snarkyjs";
 
 export class Admin extends RuntimeModule<unknown> {
   @state() public admin = State.from<PublicKey>(PublicKey);
 
   @runtimeMethod()
   public setAdmin(newAdmin: PublicKey) {
-    this.isSenderAdmin();
+    const [isSenderAdmin, admin] = this.isSenderAdmin();
+    
+    // allow setting only if empty, or if the sender is admin
+    assert(admin.isSome.not().or(isSenderAdmin), "Sender is not admin");
+
     this.admin.set(newAdmin);
   }
 
-  public isSenderAdmin() {
+  public isSenderAdmin(): [Bool, Option<PublicKey>] {
     const admin = this.admin.get();
-    const senderIsAdmin = admin.isSome.and(
+    const isSenderAdmin = admin.isSome.and(
       this.transaction.sender.equals(admin.value)
     );
 
-    assert(admin.isSome.not().or(senderIsAdmin), "Sender is not admin");
+    return [isSenderAdmin, admin];
   }
 }

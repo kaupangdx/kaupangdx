@@ -53,5 +53,25 @@ describe("Balances", () => {
       expect(block?.txs[0].status).toBe(true);
       expect(currentAdmin?.toBase58()).toBe(alice.toBase58());
     });
+
+    it("should not set admin when an admin was already set", async () => {
+      const tx = appChain.transaction(bob, () => {
+        admin.setAdmin(bob);
+      });
+
+      const inMemorySigner = appChain.resolveOrFail("Signer", InMemorySigner);
+      inMemorySigner.config.signer = bobPrivateKey;
+
+      await tx.sign();
+      await tx.send();
+
+      const block = await appChain.produceBlock();
+
+      const currentAdmin = await appChain.query.runtime.Admin.admin.get();
+
+      expect(block?.txs[0].status).toBe(false);
+      expect(block?.txs[0].statusMessage).toMatch(/Sender is not admin/);
+      expect(currentAdmin?.toBase58()).toBe(alice.toBase58());
+    });
   });
 });
