@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { InMemorySigner, TestingAppChain } from "@proto-kit/sdk";
 import { PrivateKey, UInt64 } from "snarkyjs";
 import { Balances, BalancesKey, TokenId } from "./Balances";
@@ -12,6 +13,7 @@ describe("Balances", () => {
     Admin: typeof Admin;
   }>;
   let balances: Balances;
+  let admin: Admin;
 
   const alicePrivateKey = PrivateKey.random();
   const alice = alicePrivateKey.toPublicKey();
@@ -35,10 +37,27 @@ describe("Balances", () => {
 
     appChain.setSigner(alicePrivateKey);
     balances = appChain.runtime.resolve("Balances");
+    admin = appChain.runtime.resolve("Admin");
   });
 
   describe("mint", () => {
-    it("should mint a balance for alice", async () => {
+    beforeAll(async () => {
+      const tx = appChain.transaction(alice, () => {
+        admin.setAdmin(alice);
+      });
+
+      await tx.sign();
+      await tx.send();
+
+      await appChain.produceBlock();
+    });
+
+    afterAll(async () => {
+      const inMemorySigner = appChain.resolveOrFail("Signer", InMemorySigner);
+      inMemorySigner.config.signer = alicePrivateKey;
+    });
+
+    it("should mint a balance for alice, if alice is admin", async () => {
       const tx = appChain.transaction(alice, () => {
         balances.mint(tokenId, alice, UInt64.from(1000));
       });
@@ -57,6 +76,31 @@ describe("Balances", () => {
 
       expect(block?.txs[0].status, block?.txs[0].statusMessage).toBe(true);
       expect(aliceBalance?.toBigInt()).toBe(1000n);
+    });
+
+    it("should not mint a balance for bob, if bob is not an admin", async () => {
+      const tx = appChain.transaction(bob, () => {
+        balances.mint(tokenId, bob, UInt64.from(1000));
+      });
+
+      const inMemorySigner = appChain.resolveOrFail("Signer", InMemorySigner);
+      inMemorySigner.config.signer = bobPrivateKey;
+
+      await tx.sign();
+      await tx.send();
+
+      const block = await appChain.produceBlock();
+
+      const bobBalance = await appChain.query.runtime.Balances.balances.get(
+        BalancesKey.from({
+          tokenId,
+          address: bob,
+        })
+      );
+
+      expect(block?.txs[0].status).toBe(false);
+      expect(block?.txs[0].statusMessage).toMatch(/Sender is not admin/);
+      expect(bobBalance?.toBigInt() ?? 0n).toBe(0n);
     });
   });
 

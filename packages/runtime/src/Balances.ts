@@ -8,6 +8,8 @@ import {
 import { StateMap, assert } from "@proto-kit/protocol";
 
 import { Field, Provable, PublicKey, Struct, UInt64 } from "snarkyjs";
+import { inject } from "tsyringe";
+import { Admin } from "./Admin";
 
 export const errors = {
   senderNotFrom: () => "Sender does not match 'from'",
@@ -32,6 +34,10 @@ export class Balances extends RuntimeModule<unknown> {
     BalancesKey,
     Balance
   );
+
+  public constructor(@inject("Admin") public admin: Admin) {
+    super();
+  }
 
   public getBalance(tokenId: TokenId, address: PublicKey): Balance {
     const key = new BalancesKey({ tokenId, address });
@@ -81,6 +87,7 @@ export class Balances extends RuntimeModule<unknown> {
 
   @runtimeMethod()
   public mint(tokenId: TokenId, address: PublicKey, amount: Balance) {
+    this.admin.assertIsSenderAdmin();
     const balance = this.getBalance(tokenId, address);
     const newBalance = balance.add(amount);
     this.setBalance(tokenId, address, newBalance);

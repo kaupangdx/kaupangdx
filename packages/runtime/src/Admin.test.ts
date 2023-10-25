@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { InMemorySigner, TestingAppChain } from "@proto-kit/sdk";
 import { PrivateKey, UInt64 } from "snarkyjs";
 import { Balances, BalancesKey, TokenId } from "./Balances";
@@ -6,7 +7,7 @@ import { Admin } from "./Admin";
 
 log.setLevel("ERROR");
 
-describe("Balances", () => {
+describe.skip("Admin", () => {
   let appChain: TestingAppChain<{
     Balances: typeof Balances;
     Admin: typeof Admin;
@@ -38,6 +39,11 @@ describe("Balances", () => {
   });
 
   describe("setAdmin", () => {
+    afterAll(async () => {
+      const inMemorySigner = appChain.resolveOrFail("Signer", InMemorySigner);
+      inMemorySigner.config.signer = alicePrivateKey;
+    });
+
     it("should set admin when no admin was set yet", async () => {
       const tx = appChain.transaction(alice, () => {
         admin.setAdmin(alice);

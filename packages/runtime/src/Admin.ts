@@ -8,9 +8,12 @@ export class Admin extends RuntimeModule<unknown> {
   @runtimeMethod()
   public setAdmin(newAdmin: PublicKey) {
     const [isSenderAdmin, admin] = this.isSenderAdmin();
-    
+
     // allow setting only if empty, or if the sender is admin
-    assert(admin.isSome.not().or(isSenderAdmin), "Sender is not admin");
+    assert(
+      admin.isSome.not().or(isSenderAdmin),
+      "Sender is not admin, or the admin is not empty"
+    );
 
     this.admin.set(newAdmin);
   }
@@ -22,5 +25,10 @@ export class Admin extends RuntimeModule<unknown> {
     );
 
     return [isSenderAdmin, admin];
+  }
+
+  public assertIsSenderAdmin() {
+    const [isSenderAdmin] = this.isSenderAdmin();
+    assert(isSenderAdmin, "Sender is not admin");
   }
 }
