@@ -7,7 +7,7 @@ import { Admin } from "./Admin";
 
 log.setLevel("ERROR");
 
-describe.skip("Admin", () => {
+describe("Admin", () => {
   let appChain: TestingAppChain<{
     Balances: typeof Balances;
     Admin: typeof Admin;
