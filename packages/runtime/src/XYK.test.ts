@@ -86,8 +86,6 @@ describe("xyk", () => {
 
     await tx1.sign();
     await tx1.send();
-    nonce++;
-
     await appChain.produceBlock();
 
     const tx2 = appChain.transaction(
@@ -100,8 +98,6 @@ describe("xyk", () => {
 
     await tx2.sign();
     await tx2.send();
-    nonce++;
-
     await appChain.produceBlock();
 
     const balanceIn = await getBalance(tokenInId, alice);
@@ -127,8 +123,6 @@ describe("xyk", () => {
 
     await tx.sign();
     await tx.send();
-    nonce++;
-
     await appChain.produceBlock();
 
     const balanceIn = await getBalance(tokenInId, alice);
@@ -154,8 +148,6 @@ describe("xyk", () => {
 
     await tx.sign();
     await tx.send();
-    nonce++;
-
     const block = await appChain.produceBlock();
 
     expect(block?.txs[0].status).toBe(false);
