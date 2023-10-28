@@ -137,4 +137,28 @@ describe("xyk", () => {
     expect(balanceIn?.toBigInt()).toBe(balanceToMint - initialLiquidityA);
     expect(balanceOut?.toBigInt()).toBe(balanceToMint - initialLiquidityB);
   });
+
+  it("should not create a pool, if one already exists", async () => {
+    const tx = appChain.transaction(
+      alice,
+      () => {
+        xyk.createPool(
+          tokenInId,
+          tokenOutId,
+          Balance.from(initialLiquidityA),
+          Balance.from(initialLiquidityB)
+        );
+      },
+      { nonce }
+    );
+
+    await tx.sign();
+    await tx.send();
+    nonce++;
+
+    const block = await appChain.produceBlock();
+
+    expect(block?.txs[0].status).toBe(false);
+    expect(block?.txs[0].statusMessage).toMatch(/Pool already exists/);
+  });
 });
