@@ -40,7 +40,7 @@ describe("Balances", () => {
     admin = appChain.runtime.resolve("Admin");
   });
 
-  describe("mint", () => {
+  describe.only("mint", () => {
     beforeAll(async () => {
       const tx = appChain.transaction(alice, () => {
         admin.setAdmin(alice);
@@ -101,6 +101,60 @@ describe("Balances", () => {
       expect(block?.txs[0].status).toBe(false);
       expect(block?.txs[0].statusMessage).toMatch(/Sender is not admin/);
       expect(bobBalance?.toBigInt() ?? 0n).toBe(0n);
+    });
+  });
+
+  describe.only("burn", () => {
+    const burnAmount = UInt64.from(1000);
+
+    beforeAll(async () => {
+      const tx1 = appChain.transaction(alice, () => {
+        admin.setAdmin(alice);
+      });
+
+      await tx1.sign();
+      await tx1.send();
+
+      const tx2 = appChain.transaction(alice, () => {
+        balances.mint(tokenId, alice, burnAmount);
+      });
+
+      await tx2.sign();
+      await tx2.send();
+
+      console.log("beforeAll", await appChain.produceBlock());
+      console.log(
+        "aliceBalance",
+        (
+          await appChain.query.runtime.Balances.balances.get(
+            BalancesKey.from({
+              tokenId,
+              address: alice,
+            })
+          )
+        )?.toBigInt()
+      );
+    });
+
+    it("should burn a balance for alice, if alice is admin", async () => {
+      const tx = appChain.transaction(alice, () => {
+        balances.burn(tokenId, alice, burnAmount);
+      });
+
+      await tx.sign();
+      await tx.send();
+
+      const block = await appChain.produceBlock();
+
+      const aliceBalance = await appChain.query.runtime.Balances.balances.get(
+        BalancesKey.from({
+          tokenId,
+          address: alice,
+        })
+      );
+
+      expect(block?.txs[0].status, block?.txs[0].statusMessage).toBe(true);
+      expect(aliceBalance?.toBigInt()).toBe(0n);
     });
   });
 

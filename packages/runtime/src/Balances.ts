@@ -14,6 +14,7 @@ import { Admin } from "./Admin";
 export const errors = {
   senderNotFrom: () => "Sender does not match 'from'",
   fromBalanceInsufficient: () => "From balance is insufficient",
+  burnBalanceInsufficient: () => "Burn balance is insufficient",
 };
 
 export class TokenId extends Field {}
@@ -90,6 +91,29 @@ export class Balances extends RuntimeModule<unknown> {
     this.admin.assertIsSenderAdmin();
     const balance = this.getBalance(tokenId, address);
     const newBalance = balance.add(amount);
+    Provable.log("mint", { address, balance, newBalance, amount });
+    this.setBalance(tokenId, address, newBalance);
+  }
+
+  @runtimeMethod()
+  public burn(tokenId: TokenId, address: PublicKey, amount: Balance) {
+    this.admin.assertIsSenderAdmin();
+    const balance = this.getBalance(tokenId, address);
+
+    const balanceIsSufficient = balance.lessThan(amount);
+    assert(balanceIsSufficient, errors.burnBalanceInsufficient());
+
+    Provable.log("burn", { balance, amount, balanceIsSufficient });
+
+    const paddedBalance = Provable.if<UInt64>(
+      balanceIsSufficient,
+      UInt64,
+      balance.add(amount),
+      balance
+    );
+
+    const newBalance = paddedBalance.sub(amount);
+
     this.setBalance(tokenId, address, newBalance);
   }
 
