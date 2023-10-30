@@ -91,7 +91,6 @@ export class Balances extends RuntimeModule<unknown> {
     this.admin.assertIsSenderAdmin();
     const balance = this.getBalance(tokenId, address);
     const newBalance = balance.add(amount);
-    Provable.log("mint", { address, balance, newBalance, amount });
     this.setBalance(tokenId, address, newBalance);
   }
 
@@ -100,16 +99,14 @@ export class Balances extends RuntimeModule<unknown> {
     this.admin.assertIsSenderAdmin();
     const balance = this.getBalance(tokenId, address);
 
-    const balanceIsSufficient = balance.lessThan(amount);
+    const balanceIsSufficient = balance.greaterThanOrEqual(amount);
     assert(balanceIsSufficient, errors.burnBalanceInsufficient());
-
-    Provable.log("burn", { balance, amount, balanceIsSufficient });
 
     const paddedBalance = Provable.if<UInt64>(
       balanceIsSufficient,
       UInt64,
-      balance.add(amount),
-      balance
+      balance,
+      balance.add(amount)
     );
 
     const newBalance = paddedBalance.sub(amount);

@@ -40,7 +40,7 @@ describe("Balances", () => {
     admin = appChain.runtime.resolve("Admin");
   });
 
-  describe.only("mint", () => {
+  describe("mint", () => {
     beforeAll(async () => {
       const tx = appChain.transaction(alice, () => {
         admin.setAdmin(alice);
@@ -104,7 +104,7 @@ describe("Balances", () => {
     });
   });
 
-  describe.only("burn", () => {
+  describe("burn", () => {
     const burnAmount = UInt64.from(1000);
 
     beforeAll(async () => {
@@ -115,25 +115,7 @@ describe("Balances", () => {
       await tx1.sign();
       await tx1.send();
 
-      const tx2 = appChain.transaction(alice, () => {
-        balances.mint(tokenId, alice, burnAmount);
-      });
-
-      await tx2.sign();
-      await tx2.send();
-
-      console.log("beforeAll", await appChain.produceBlock());
-      console.log(
-        "aliceBalance",
-        (
-          await appChain.query.runtime.Balances.balances.get(
-            BalancesKey.from({
-              tokenId,
-              address: alice,
-            })
-          )
-        )?.toBigInt()
-      );
+      await appChain.produceBlock();
     });
 
     it("should burn a balance for alice, if alice is admin", async () => {
@@ -159,6 +141,17 @@ describe("Balances", () => {
   });
 
   describe("transferSigned", () => {
+    beforeAll(async () => {
+      const tx1 = appChain.transaction(alice, () => {
+        balances.mint(tokenId, alice, UInt64.from(1000));
+      });
+
+      await tx1.sign();
+      await tx1.send();
+
+      await appChain.produceBlock();
+    });
+
     it("should transfer a balance from alice to bob", async () => {
       const tx = appChain.transaction(alice, () => {
         balances.transferSigned(tokenId, alice, bob, UInt64.from(500));
