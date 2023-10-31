@@ -59,7 +59,7 @@ describe("Balances", () => {
 
     it("should mint a balance for alice, if alice is admin", async () => {
       const tx = appChain.transaction(alice, () => {
-        balances.mint(tokenId, alice, UInt64.from(1000));
+        balances.mintAdmin(tokenId, alice, UInt64.from(1000));
       });
 
       await tx.sign();
@@ -80,7 +80,7 @@ describe("Balances", () => {
 
     it("should not mint a balance for bob, if bob is not an admin", async () => {
       const tx = appChain.transaction(bob, () => {
-        balances.mint(tokenId, bob, UInt64.from(1000));
+        balances.mintAdmin(tokenId, bob, UInt64.from(1000));
       });
 
       const inMemorySigner = appChain.resolveOrFail("Signer", InMemorySigner);
@@ -143,7 +143,7 @@ describe("Balances", () => {
   describe("transferSigned", () => {
     beforeAll(async () => {
       const tx1 = appChain.transaction(alice, () => {
-        balances.mint(tokenId, alice, UInt64.from(1000));
+        balances.mintAdmin(tokenId, alice, UInt64.from(1000));
       });
 
       await tx1.sign();

@@ -43,6 +43,17 @@ export class PoolKey extends PublicKey {
   }
 }
 
+export class LPTokenId extends TokenId {
+  public static fromTokenIdPair(
+    tokenInId: TokenId,
+    tokenOutId: TokenId
+  ): TokenId {
+    return TokenId.from(
+      Poseidon.hash(TokenPair.toFields(TokenPair.from(tokenInId, tokenOutId)))
+    );
+  }
+}
+
 export const errors = {
   poolExists: () => "Pool already exists",
   tokensMatch: () => "Cannot create pool with matching tokens",
@@ -84,5 +95,8 @@ export class XYK extends RuntimeModule<unknown> {
 
     this.balances.transfer(tokenInId, creator, pool, tokenInAmount);
     this.balances.transfer(tokenOutId, creator, pool, tokenOutAmount);
+
+    const lpTokenId = LPTokenId.fromTokenIdPair(tokenInId, tokenOutId);
+    this.balances.mint(lpTokenId, creator, tokenInAmount);
   }
 }

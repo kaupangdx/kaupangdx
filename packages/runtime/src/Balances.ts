@@ -86,12 +86,17 @@ export class Balances extends RuntimeModule<unknown> {
     this.setBalance(tokenId, to, newToBalance);
   }
 
-  @runtimeMethod()
   public mint(tokenId: TokenId, address: PublicKey, amount: Balance) {
     this.admin.assertIsSenderAdmin();
     const balance = this.getBalance(tokenId, address);
     const newBalance = balance.add(amount);
     this.setBalance(tokenId, address, newBalance);
+  }
+
+  @runtimeMethod()
+  public mintAdmin(tokenId: TokenId, address: PublicKey, amount: Balance) {
+    this.admin.assertIsSenderAdmin();
+    this.mint(tokenId, address, amount);
   }
 
   @runtimeMethod()

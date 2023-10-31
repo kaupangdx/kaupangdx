@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { TestingAppChain } from "@proto-kit/sdk";
 import { PrivateKey, PublicKey } from "snarkyjs";
 import { Balance, Balances, BalancesKey, TokenId } from "./Balances";
-import { PoolKey, XYK } from "./XYK";
+import { LPTokenId, PoolKey, XYK } from "./XYK";
 import { Admin } from "./Admin";
 
 type RuntimeModules = {
@@ -79,7 +79,7 @@ describe("xyk", () => {
     const tx1 = appChain.transaction(
       alice,
       () => {
-        balances.mint(tokenInId, alice, Balance.from(balanceToMint));
+        balances.mintAdmin(tokenInId, alice, Balance.from(balanceToMint));
       },
       { nonce }
     );
@@ -91,7 +91,7 @@ describe("xyk", () => {
     const tx2 = appChain.transaction(
       alice,
       () => {
-        balances.mint(tokenOutId, alice, Balance.from(balanceToMint));
+        balances.mintAdmin(tokenOutId, alice, Balance.from(balanceToMint));
       },
       { nonce }
     );
@@ -127,9 +127,14 @@ describe("xyk", () => {
 
     const balanceIn = await getBalance(tokenInId, alice);
     const balanceOut = await getBalance(tokenOutId, alice);
+    const balanceLP = await getBalance(
+      LPTokenId.fromTokenIdPair(tokenInId, tokenOutId),
+      alice
+    );
 
     expect(balanceIn?.toBigInt()).toBe(balanceToMint - initialLiquidityA);
     expect(balanceOut?.toBigInt()).toBe(balanceToMint - initialLiquidityB);
+    expect(balanceLP?.toBigInt()).toBe(initialLiquidityA);
   });
 
   it("should not create a pool, if one already exists", async () => {
