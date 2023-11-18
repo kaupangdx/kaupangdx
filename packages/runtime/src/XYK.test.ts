@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { TestingAppChain } from "@proto-kit/sdk";
-import { PrivateKey, PublicKey } from "snarkyjs";
+import { PrivateKey, PublicKey } from "o1js";
 import { Balance, Balances, BalancesKey, TokenId } from "./Balances";
 import { LPTokenId, PoolKey, XYK } from "./XYK";
 import { Admin } from "./Admin";
@@ -65,7 +65,7 @@ describe("xyk", () => {
   });
 
   beforeAll(async () => {
-    const tx = appChain.transaction(alice, () => {
+    const tx = await appChain.transaction(alice, () => {
       admin.setAdmin(alice);
     });
 
@@ -76,7 +76,7 @@ describe("xyk", () => {
   });
 
   it("should mint balance for alice", async () => {
-    const tx1 = appChain.transaction(
+    const tx1 = await appChain.transaction(
       alice,
       () => {
         balances.mintAdmin(tokenInId, alice, Balance.from(balanceToMint));
@@ -88,7 +88,7 @@ describe("xyk", () => {
     await tx1.send();
     await appChain.produceBlock();
 
-    const tx2 = appChain.transaction(
+    const tx2 = await appChain.transaction(
       alice,
       () => {
         balances.mintAdmin(tokenOutId, alice, Balance.from(balanceToMint));
@@ -108,7 +108,7 @@ describe("xyk", () => {
   });
 
   it("should create a pool", async () => {
-    const tx = appChain.transaction(
+    const tx = await appChain.transaction(
       alice,
       () => {
         xyk.createPool(
@@ -138,7 +138,7 @@ describe("xyk", () => {
   });
 
   it("should not create a pool, if one already exists", async () => {
-    const tx = appChain.transaction(
+    const tx = await appChain.transaction(
       alice,
       () => {
         xyk.createPool(

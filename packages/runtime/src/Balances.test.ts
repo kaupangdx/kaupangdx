@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { InMemorySigner, TestingAppChain } from "@proto-kit/sdk";
-import { PrivateKey, UInt64 } from "snarkyjs";
+import { PrivateKey, UInt64 } from "o1js";
 import { Balances, BalancesKey, TokenId } from "./Balances";
 import { log } from "@proto-kit/common";
 import { Admin } from "./Admin";
@@ -42,7 +42,7 @@ describe("Balances", () => {
 
   describe("mint", () => {
     beforeAll(async () => {
-      const tx = appChain.transaction(alice, () => {
+      const tx = await appChain.transaction(alice, () => {
         admin.setAdmin(alice);
       });
 
@@ -58,7 +58,7 @@ describe("Balances", () => {
     });
 
     it("should mint a balance for alice, if alice is admin", async () => {
-      const tx = appChain.transaction(alice, () => {
+      const tx = await appChain.transaction(alice, () => {
         balances.mintAdmin(tokenId, alice, UInt64.from(1000));
       });
 
@@ -79,7 +79,7 @@ describe("Balances", () => {
     });
 
     it("should not mint a balance for bob, if bob is not an admin", async () => {
-      const tx = appChain.transaction(bob, () => {
+      const tx = await appChain.transaction(bob, () => {
         balances.mintAdmin(tokenId, bob, UInt64.from(1000));
       });
 
@@ -108,7 +108,7 @@ describe("Balances", () => {
     const burnAmount = UInt64.from(1000);
 
     beforeAll(async () => {
-      const tx1 = appChain.transaction(alice, () => {
+      const tx1 = await appChain.transaction(alice, () => {
         admin.setAdmin(alice);
       });
 
@@ -119,7 +119,7 @@ describe("Balances", () => {
     });
 
     it("should burn a balance for alice, if alice is admin", async () => {
-      const tx = appChain.transaction(alice, () => {
+      const tx = await appChain.transaction(alice, () => {
         balances.burn(tokenId, alice, burnAmount);
       });
 
@@ -142,7 +142,7 @@ describe("Balances", () => {
 
   describe("transferSigned", () => {
     beforeAll(async () => {
-      const tx1 = appChain.transaction(alice, () => {
+      const tx1 = await appChain.transaction(alice, () => {
         balances.mintAdmin(tokenId, alice, UInt64.from(1000));
       });
 
@@ -153,7 +153,7 @@ describe("Balances", () => {
     });
 
     it("should transfer a balance from alice to bob", async () => {
-      const tx = appChain.transaction(alice, () => {
+      const tx = await appChain.transaction(alice, () => {
         balances.transferSigned(tokenId, alice, bob, UInt64.from(500));
       });
 
@@ -182,7 +182,7 @@ describe("Balances", () => {
     });
 
     it("should not transfer a balance from alice to bob, if the transaction is not signed properly", async () => {
-      const tx = appChain.transaction(alice, () => {
+      const tx = await appChain.transaction(alice, () => {
         balances.transferSigned(tokenId, alice, bob, UInt64.from(500));
       });
 

@@ -7,7 +7,7 @@ import {
 
 import { StateMap, assert } from "@proto-kit/protocol";
 
-import { Field, Provable, PublicKey, Struct, UInt64 } from "snarkyjs";
+import { Field, Provable, PublicKey, Struct, UInt64 } from "o1js";
 import { inject } from "tsyringe";
 import { Admin } from "./Admin";
 

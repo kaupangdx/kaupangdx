@@ -1,6 +1,6 @@
 import { RuntimeModule, runtimeMethod, state } from "@proto-kit/module";
 import { Option, State, assert } from "@proto-kit/protocol";
-import { Bool, PublicKey } from "snarkyjs";
+import { Bool, PublicKey } from "o1js";
 
 export class Admin extends RuntimeModule<unknown> {
   @state() public admin = State.from<PublicKey>(PublicKey);

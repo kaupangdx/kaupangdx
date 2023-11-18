@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { InMemorySigner, TestingAppChain } from "@proto-kit/sdk";
-import { PrivateKey, UInt64 } from "snarkyjs";
+import { PrivateKey, UInt64 } from "o1js";
 import { Balances, BalancesKey, TokenId } from "./Balances";
 import { log } from "@proto-kit/common";
 import { Admin } from "./Admin";
@@ -45,7 +45,7 @@ describe("Admin", () => {
     });
 
     it("should set admin when no admin was set yet", async () => {
-      const tx = appChain.transaction(alice, () => {
+      const tx = await appChain.transaction(alice, () => {
         admin.setAdmin(alice);
       });
 
@@ -61,7 +61,7 @@ describe("Admin", () => {
     });
 
     it("should not set admin when an admin was already set", async () => {
-      const tx = appChain.transaction(bob, () => {
+      const tx = await appChain.transaction(bob, () => {
         admin.setAdmin(bob);
       });
 

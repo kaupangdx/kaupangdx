@@ -7,7 +7,7 @@ import {
 } from "@proto-kit/module";
 import { StateMap, assert } from "@proto-kit/protocol";
 
-import { Field, Group, Poseidon, Provable, PublicKey, Struct } from "snarkyjs";
+import { Field, Group, Poseidon, Provable, PublicKey, Struct } from "o1js";
 import { Balance, Balances, TokenId } from "./Balances";
 import { inject } from "tsyringe";
 
