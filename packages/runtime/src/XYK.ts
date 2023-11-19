@@ -12,25 +12,25 @@ import { Balance, Balances, TokenId } from "./Balances";
 import { inject } from "tsyringe";
 
 export class TokenPair extends Struct({
-  tokenInId: TokenId,
-  tokenOutId: TokenId,
+  tokenA: TokenId,
+  tokenB: TokenId,
 }) {
-  public static from(tokenInId: TokenId, tokenOutId: TokenId) {
+  public static from(tokenA: TokenId, tokenB: TokenId) {
     return Provable.if(
-      tokenInId.greaterThan(tokenOutId),
+      tokenA.greaterThan(tokenB),
       TokenPair,
-      new TokenPair({ tokenInId, tokenOutId }),
-      new TokenPair({ tokenInId: tokenOutId, tokenOutId: tokenInId })
+      new TokenPair({ tokenA: tokenA, tokenB: tokenB }),
+      new TokenPair({ tokenA: tokenB, tokenB: tokenA })
     );
   }
 }
 
 export class PoolKey extends PublicKey {
   public static fromTokenIdPair(
-    tokenInId: TokenId,
-    tokenOutId: TokenId
+    tokenA: TokenId,
+    tokenB: TokenId
   ): PoolKey {
-    const tokenPair = TokenPair.from(tokenInId, tokenOutId);
+    const tokenPair = TokenPair.from(tokenA, tokenB);
 
     const {
       x,
@@ -45,11 +45,11 @@ export class PoolKey extends PublicKey {
 
 export class LPTokenId extends TokenId {
   public static fromTokenIdPair(
-    tokenInId: TokenId,
-    tokenOutId: TokenId
+    tokenA: TokenId,
+    tokenB: TokenId
   ): TokenId {
     return TokenId.from(
-      Poseidon.hash(TokenPair.toFields(TokenPair.from(tokenInId, tokenOutId)))
+      Poseidon.hash(TokenPair.toFields(TokenPair.from(tokenA, tokenB)))
     );
   }
 }
@@ -79,24 +79,23 @@ export class XYK extends RuntimeModule<unknown> {
 
   @runtimeMethod()
   public createPool(
-    tokenInId: TokenId,
-    tokenOutId: TokenId,
-    tokenInAmount: Balance,
-    tokenOutAmount: Balance
+    tokenA: TokenId,
+    tokenB: TokenId,
+    tokenASupply: Balance,
+    tokenBSupply: Balance
   ) {
-    assert(tokenInId.equals(tokenOutId).not(), errors.tokensMatch());
-    assert(this.poolExists(tokenInId, tokenOutId).not(), errors.poolExists());
+    assert(tokenA.equals(tokenB).not(), errors.tokensMatch());
+    assert(this.poolExists(tokenA, tokenB).not(), errors.poolExists());
 
-    const key = PoolKey.fromTokenIdPair(tokenInId, tokenOutId);
-    this.pools.set(key, XYK.defaultPoolValue);
+    const poolKey = PoolKey.fromTokenIdPair(tokenA, tokenB);
+    this.pools.set(poolKey, XYK.defaultPoolValue);
 
     const creator = this.transaction.sender;
-    const pool = PoolKey.fromTokenIdPair(tokenInId, tokenOutId);
 
-    this.balances.transfer(tokenInId, creator, pool, tokenInAmount);
-    this.balances.transfer(tokenOutId, creator, pool, tokenOutAmount);
+    this.balances.transfer(tokenA, creator, poolKey, tokenASupply);
+    this.balances.transfer(tokenB, creator, poolKey, tokenBSupply);
 
-    const lpTokenId = LPTokenId.fromTokenIdPair(tokenInId, tokenOutId);
-    this.balances.mint(lpTokenId, creator, tokenInAmount);
+    const lpTokenId = LPTokenId.fromTokenIdPair(tokenA, tokenB);
+    this.balances.mint(lpTokenId, creator, tokenASupply);
   }
 }
