@@ -56,9 +56,10 @@ export class LPTokenId extends TokenId {
 
 export const errors = {
   poolExists: () => "Pool already exists",
+  poolDoesNotExist: () => "Pool does not exist",
   tokensMatch: () => "Cannot create pool with matching tokens",
-  tokenOutAmountTooLow: () => "Token out amount too low",
-  tokenInAmountTooHigh: () => "Token in amount too high",
+  amountOutTooLow: () => "Token out amount too low",
+  amountInTooHigh: () => "Token in amount too high",
 };
 
 @runtimeModule()
@@ -70,11 +71,15 @@ export class XYK extends RuntimeModule<unknown> {
     super();
   }
 
-  public poolExists(tokenInId: TokenId, tokenOutId: TokenId) {
-    const key = PoolKey.fromTokenIdPair(tokenInId, tokenOutId);
+  public poolExists(tokenA: TokenId, tokenB: TokenId) {
+    const key = PoolKey.fromTokenIdPair(tokenA, tokenB);
     const pool = this.pools.get(key);
 
     return pool.isSome;
+  }
+
+  public assertPoolExists(tokenA: TokenId, tokenB: TokenId) {
+    assert(this.poolExists(tokenA, tokenB), errors.poolDoesNotExist());
   }
 
   @runtimeMethod()
@@ -97,5 +102,150 @@ export class XYK extends RuntimeModule<unknown> {
 
     const lpTokenId = LPTokenId.fromTokenIdPair(tokenA, tokenB);
     this.balances.mint(lpTokenId, creator, tokenASupply);
+  }
+
+  public calculateTokenOutAmount(
+    tokenIn: TokenId,
+    tokenOut: TokenId,
+    amountIn: Balance
+  ) {
+    const pool = PoolKey.fromTokenIdPair(tokenIn, tokenOut);
+
+    const reserveIn = this.balances.getBalance(tokenIn, pool);
+    const reserveOut = this.balances.getBalance(tokenOut, pool);
+
+    return this.calculateTokenOutAmountFromReserves(
+      reserveIn,
+      reserveOut,
+      amountIn
+    );
+  }
+
+  public calculateTokenOutAmountFromReserves(
+    reserveIn: Balance,
+    reserveOut: Balance,
+    amountIn: Balance
+  ) {
+    const numerator = amountIn.mul(reserveOut);
+    const denominator = reserveIn.add(amountIn);
+
+    return numerator.div(denominator);
+  }
+
+  public calculateAmountIn(
+    tokenIn: TokenId,
+    tokenOut: TokenId,
+    amountOut: Balance
+  ) {
+    const pool = PoolKey.fromTokenIdPair(tokenIn, tokenOut);
+
+    const reserveIn = this.balances.getBalance(tokenIn, pool);
+    const reserveOut = this.balances.getBalance(tokenOut, pool);
+
+    return this.calculateAmountInFromReserves(
+      reserveIn,
+      reserveOut,
+      amountOut
+    );
+  }
+
+  public calculateAmountInFromReserves(
+    reserveIn: Balance,
+    reserveOut: Balance,
+    amountOut: Balance
+  ) {
+    const paddedTokenOutReserve = reserveOut.add(amountOut);
+    const reserveOutIsSufficient = reserveOut.greaterThanOrEqual(amountOut);
+
+    const safeTokenOutReserve = Provable.if(
+      reserveOutIsSufficient,
+      Balance,
+      reserveOut,
+      paddedTokenOutReserve
+    );
+
+    const numerator = reserveIn.mul(amountOut);
+
+    const denominator = safeTokenOutReserve.sub(amountOut);
+
+    const denominatorIsSafe = denominator.greaterThan(Balance.from(0));
+    const safeDenominator = Provable.if(
+      denominatorIsSafe,
+      Balance,
+      denominator,
+      Balance.from(1)
+    );
+
+    assert(denominatorIsSafe);
+
+    const tokenInAmount = numerator.div(safeDenominator);
+
+    return tokenInAmount;
+  }
+
+  @runtimeMethod()
+  public swapExactTokensForTokens(
+    tokenIn: TokenId,
+    tokenOut: TokenId,
+    amountIn: Balance,
+    minAmountOut: Balance
+  ) {
+    this.assertPoolExists(tokenIn, tokenOut);
+    const pool = PoolKey.fromTokenIdPair(tokenIn, tokenOut);
+
+    const amountOut = this.calculateTokenOutAmount(
+      tokenIn,
+      tokenOut,
+      amountIn
+    );
+
+    assert(amountOut.greaterThanOrEqual(minAmountOut), errors.amountOutTooLow());
+
+    this.balances.transfer(
+      tokenIn,
+      this.transaction.sender,
+      pool,
+      amountIn
+    );
+
+    this.balances.transfer(
+      tokenOut,
+      pool,
+      this.transaction.sender,
+      amountOut
+    );
+  }
+
+  @runtimeMethod()
+  public swapTokensForExactTokens(
+    tokenIn: TokenId,
+    tokenOut: TokenId,
+    maxAmountIn: Balance,
+    amountOut: Balance
+  ) {
+    this.assertPoolExists(tokenIn, tokenOut);
+    const pool = PoolKey.fromTokenIdPair(tokenIn, tokenOut);
+
+    const amountIn = this.calculateAmountIn(
+      tokenIn,
+      tokenOut,
+      amountOut
+    );
+
+    assert(amountIn.lessThanOrEqual(maxAmountIn), errors.amountInTooHigh());
+
+    this.balances.transfer(
+      tokenOut,
+      pool,
+      this.transaction.sender,
+      amountOut
+    );
+
+    this.balances.transfer(
+      tokenIn,
+      this.transaction.sender,
+      pool,
+      amountIn
+    );
   }
 }
