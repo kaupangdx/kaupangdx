@@ -54,6 +54,8 @@ export class LPTokenId extends TokenId {
   }
 }
 
+export const MINIMUM_LIQUIDITY = UInt64.from(100);
+
 export const errors = {
   tokenASupplyIsZero: () => "Token A supply is zero",
   tokenBSupplyIsZero: () => "Token B supply is zero",
@@ -106,8 +108,14 @@ export class XYK extends RuntimeModule<unknown> {
     this.balances.transfer(tokenA, creator, poolKey, tokenASupply);
     this.balances.transfer(tokenB, creator, poolKey, tokenBSupply);
 
-    const lpTokenId = LPTokenId.fromTokenPair(tokenA, tokenB);
-    this.balances.mint(lpTokenId, creator, tokenASupply);
+    const lpToken = LPTokenId.fromTokenPair(tokenA, tokenB);
+    // sqrt(supplyA, supplyB) - MINIMUM_LIQUIDITY
+    // We're dealing with uint type so modular square root should be fine
+    const liquidity = UInt64.from(Field((tokenASupply.mul(tokenBSupply)).toBigInt()).sqrt()).sub(MINIMUM_LIQUIDITY);
+    // Mint lp tokens to user
+    this.balances.mint(lpToken, creator, liquidity);
+    // Minimum liquidity amount of  should be permanently locked away
+    this.balances.mint(lpToken, PublicKey.empty(), MINIMUM_LIQUIDITY);
   }
 
   @runtimeMethod()
@@ -132,7 +140,7 @@ export class XYK extends RuntimeModule<unknown> {
     const reserveA = this.balances.getBalance(tokenA, pool);
     const reserveB = this.balances.getBalance(tokenB, pool);
 
-    
+    const amountAOptimal = reserveA
   }
 
   @runtimeMethod()

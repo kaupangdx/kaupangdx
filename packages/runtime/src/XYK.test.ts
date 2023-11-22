@@ -128,7 +128,7 @@ describe("xyk", () => {
     const balanceIn = await getBalance(tokenInId, alice);
     const balanceOut = await getBalance(tokenOutId, alice);
     const balanceLP = await getBalance(
-      LPTokenId.fromTokenIdPair(tokenInId, tokenOutId),
+      LPTokenId.fromTokenPair(tokenInId, tokenOutId),
       alice
     );
 
