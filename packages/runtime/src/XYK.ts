@@ -7,7 +7,7 @@ import {
 } from "@proto-kit/module";
 import { StateMap, assert } from "@proto-kit/protocol";
 
-import { Field, Group, Poseidon, Provable, PublicKey, Struct } from "o1js";
+import { Field, Group, Poseidon, Provable, PublicKey, Struct, UInt64 } from "o1js";
 import { Balance, Balances, TokenId } from "./Balances";
 import { inject } from "tsyringe";
 
@@ -26,7 +26,7 @@ export class TokenPair extends Struct({
 }
 
 export class PoolKey extends PublicKey {
-  public static fromTokenIdPair(
+  public static fromTokenPair(
     tokenA: TokenId,
     tokenB: TokenId
   ): PoolKey {
@@ -44,7 +44,7 @@ export class PoolKey extends PublicKey {
 }
 
 export class LPTokenId extends TokenId {
-  public static fromTokenIdPair(
+  public static fromTokenPair(
     tokenA: TokenId,
     tokenB: TokenId
   ): TokenId {
@@ -55,6 +55,9 @@ export class LPTokenId extends TokenId {
 }
 
 export const errors = {
+  tokenASupplyIsZero: () => "Token A supply is zero",
+  tokenBSupplyIsZero: () => "Token B supply is zero",
+  zeroAmount: () => "Cannot deposit zero amount",
   poolExists: () => "Pool already exists",
   poolDoesNotExist: () => "Pool does not exist",
   tokensMatch: () => "Cannot create pool with matching tokens",
@@ -72,7 +75,7 @@ export class XYK extends RuntimeModule<unknown> {
   }
 
   public poolExists(tokenA: TokenId, tokenB: TokenId) {
-    const key = PoolKey.fromTokenIdPair(tokenA, tokenB);
+    const key = PoolKey.fromTokenPair(tokenA, tokenB);
     const pool = this.pools.get(key);
 
     return pool.isSome;
@@ -92,7 +95,10 @@ export class XYK extends RuntimeModule<unknown> {
     assert(tokenA.equals(tokenB).not(), errors.tokensMatch());
     assert(this.poolExists(tokenA, tokenB).not(), errors.poolExists());
 
-    const poolKey = PoolKey.fromTokenIdPair(tokenA, tokenB);
+    assert(tokenASupply.greaterThan(UInt64.zero), errors.tokenASupplyIsZero());
+    assert(tokenBSupply.greaterThan(UInt64.zero), errors.tokenBSupplyIsZero());
+
+    const poolKey = PoolKey.fromTokenPair(tokenA, tokenB);
     this.pools.set(poolKey, XYK.defaultPoolValue);
 
     const creator = this.transaction.sender;
@@ -100,8 +106,40 @@ export class XYK extends RuntimeModule<unknown> {
     this.balances.transfer(tokenA, creator, poolKey, tokenASupply);
     this.balances.transfer(tokenB, creator, poolKey, tokenBSupply);
 
-    const lpTokenId = LPTokenId.fromTokenIdPair(tokenA, tokenB);
+    const lpTokenId = LPTokenId.fromTokenPair(tokenA, tokenB);
     this.balances.mint(lpTokenId, creator, tokenASupply);
+  }
+
+  @runtimeMethod()
+  public addLiquidity( 
+    tokenA: TokenId,
+    tokenB: TokenId,
+    amountADesired: Balance,
+    amountBDesired: Balance,
+    amountAMin: Balance,
+    amountBMin: Balance
+  ) {
+    this.assertPoolExists(tokenA, tokenB);
+    const pool = PoolKey.fromTokenPair(tokenA, tokenB);
+
+    // Amount assertions
+    assert(amountAMin.greaterThan(UInt64.zero));
+    assert(amountBMin.greaterThan(UInt64.zero));
+    assert(amountADesired.greaterThanOrEqual(amountAMin));
+    assert(amountBDesired.greaterThanOrEqual(amountBMin));
+
+    // Reserves cannot be zero due to pool creation and constant product invariant
+    const reserveA = this.balances.getBalance(tokenA, pool);
+    const reserveB = this.balances.getBalance(tokenB, pool);
+
+    
+  }
+
+  @runtimeMethod()
+  public removeLiquidity(
+    
+  ) {
+
   }
 
   public calculateTokenOutAmount(
@@ -109,7 +147,7 @@ export class XYK extends RuntimeModule<unknown> {
     tokenOut: TokenId,
     amountIn: Balance
   ) {
-    const pool = PoolKey.fromTokenIdPair(tokenIn, tokenOut);
+    const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
 
     const reserveIn = this.balances.getBalance(tokenIn, pool);
     const reserveOut = this.balances.getBalance(tokenOut, pool);
@@ -137,7 +175,7 @@ export class XYK extends RuntimeModule<unknown> {
     tokenOut: TokenId,
     amountOut: Balance
   ) {
-    const pool = PoolKey.fromTokenIdPair(tokenIn, tokenOut);
+    const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
 
     const reserveIn = this.balances.getBalance(tokenIn, pool);
     const reserveOut = this.balances.getBalance(tokenOut, pool);
@@ -191,7 +229,7 @@ export class XYK extends RuntimeModule<unknown> {
     minAmountOut: Balance
   ) {
     this.assertPoolExists(tokenIn, tokenOut);
-    const pool = PoolKey.fromTokenIdPair(tokenIn, tokenOut);
+    const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
 
     const amountOut = this.calculateTokenOutAmount(
       tokenIn,
@@ -224,7 +262,7 @@ export class XYK extends RuntimeModule<unknown> {
     amountOut: Balance
   ) {
     this.assertPoolExists(tokenIn, tokenOut);
-    const pool = PoolKey.fromTokenIdPair(tokenIn, tokenOut);
+    const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
 
     const amountIn = this.calculateAmountIn(
       tokenIn,
