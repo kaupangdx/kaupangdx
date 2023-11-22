@@ -7,7 +7,15 @@ import {
 } from "@proto-kit/module";
 import { StateMap, assert } from "@proto-kit/protocol";
 
-import { Field, Group, Poseidon, Provable, PublicKey, Struct, UInt64 } from "o1js";
+import {
+  Field,
+  Group,
+  Poseidon,
+  Provable,
+  PublicKey,
+  Struct,
+  UInt64,
+} from "o1js";
 import { Balance, Balances, TokenId } from "./Balances";
 import { inject } from "tsyringe";
 
@@ -20,16 +28,13 @@ export class TokenPair extends Struct({
       tokenA.greaterThan(tokenB),
       TokenPair,
       new TokenPair({ tokenA: tokenA, tokenB: tokenB }),
-      new TokenPair({ tokenA: tokenB, tokenB: tokenA })
+      new TokenPair({ tokenA: tokenB, tokenB: tokenA }),
     );
   }
 }
 
 export class PoolKey extends PublicKey {
-  public static fromTokenPair(
-    tokenA: TokenId,
-    tokenB: TokenId
-  ): PoolKey {
+  public static fromTokenPair(tokenA: TokenId, tokenB: TokenId): PoolKey {
     const tokenPair = TokenPair.from(tokenA, tokenB);
 
     const {
@@ -44,12 +49,9 @@ export class PoolKey extends PublicKey {
 }
 
 export class LPTokenId extends TokenId {
-  public static fromTokenPair(
-    tokenA: TokenId,
-    tokenB: TokenId
-  ): TokenId {
+  public static fromTokenPair(tokenA: TokenId, tokenB: TokenId): TokenId {
     return TokenId.from(
-      Poseidon.hash(TokenPair.toFields(TokenPair.from(tokenA, tokenB)))
+      Poseidon.hash(TokenPair.toFields(TokenPair.from(tokenA, tokenB))),
     );
   }
 }
@@ -92,7 +94,7 @@ export class XYK extends RuntimeModule<unknown> {
     tokenA: TokenId,
     tokenB: TokenId,
     tokenASupply: Balance,
-    tokenBSupply: Balance
+    tokenBSupply: Balance,
   ) {
     assert(tokenA.equals(tokenB).not(), errors.tokensMatch());
     assert(this.poolExists(tokenA, tokenB).not(), errors.poolExists());
@@ -111,7 +113,9 @@ export class XYK extends RuntimeModule<unknown> {
     const lpToken = LPTokenId.fromTokenPair(tokenA, tokenB);
     // sqrt(supplyA, supplyB) - MINIMUM_LIQUIDITY
     // We're dealing with uint type so modular square root should be fine
-    const liquidity = UInt64.from(Field((tokenASupply.mul(tokenBSupply)).toBigInt()).sqrt()).sub(MINIMUM_LIQUIDITY);
+    const liquidity = UInt64.from(
+      Field(tokenASupply.mul(tokenBSupply).toBigInt()).sqrt(),
+    ).sub(MINIMUM_LIQUIDITY);
     // Mint lp tokens to user
     this.balances.mint(lpToken, creator, liquidity);
     // Minimum liquidity amount of  should be permanently locked away
@@ -119,13 +123,13 @@ export class XYK extends RuntimeModule<unknown> {
   }
 
   @runtimeMethod()
-  public addLiquidity( 
+  public addLiquidity(
     tokenA: TokenId,
     tokenB: TokenId,
     amountADesired: Balance,
     amountBDesired: Balance,
     amountAMin: Balance,
-    amountBMin: Balance
+    amountBMin: Balance,
   ) {
     this.assertPoolExists(tokenA, tokenB);
     const pool = PoolKey.fromTokenPair(tokenA, tokenB);
@@ -140,20 +144,16 @@ export class XYK extends RuntimeModule<unknown> {
     const reserveA = this.balances.getBalance(tokenA, pool);
     const reserveB = this.balances.getBalance(tokenB, pool);
 
-    const amountAOptimal = reserveA
+    const amountAOptimal = reserveA;
   }
 
   @runtimeMethod()
-  public removeLiquidity(
-    
-  ) {
-
-  }
+  public removeLiquidity() {}
 
   public calculateTokenOutAmount(
     tokenIn: TokenId,
     tokenOut: TokenId,
-    amountIn: Balance
+    amountIn: Balance,
   ) {
     const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
 
@@ -163,14 +163,14 @@ export class XYK extends RuntimeModule<unknown> {
     return this.calculateTokenOutAmountFromReserves(
       reserveIn,
       reserveOut,
-      amountIn
+      amountIn,
     );
   }
 
   public calculateTokenOutAmountFromReserves(
     reserveIn: Balance,
     reserveOut: Balance,
-    amountIn: Balance
+    amountIn: Balance,
   ) {
     const numerator = amountIn.mul(reserveOut);
     const denominator = reserveIn.add(amountIn);
@@ -181,24 +181,20 @@ export class XYK extends RuntimeModule<unknown> {
   public calculateAmountIn(
     tokenIn: TokenId,
     tokenOut: TokenId,
-    amountOut: Balance
+    amountOut: Balance,
   ) {
     const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
 
     const reserveIn = this.balances.getBalance(tokenIn, pool);
     const reserveOut = this.balances.getBalance(tokenOut, pool);
 
-    return this.calculateAmountInFromReserves(
-      reserveIn,
-      reserveOut,
-      amountOut
-    );
+    return this.calculateAmountInFromReserves(reserveIn, reserveOut, amountOut);
   }
 
   public calculateAmountInFromReserves(
     reserveIn: Balance,
     reserveOut: Balance,
-    amountOut: Balance
+    amountOut: Balance,
   ) {
     const paddedTokenOutReserve = reserveOut.add(amountOut);
     const reserveOutIsSufficient = reserveOut.greaterThanOrEqual(amountOut);
@@ -207,7 +203,7 @@ export class XYK extends RuntimeModule<unknown> {
       reserveOutIsSufficient,
       Balance,
       reserveOut,
-      paddedTokenOutReserve
+      paddedTokenOutReserve,
     );
 
     const numerator = reserveIn.mul(amountOut);
@@ -219,7 +215,7 @@ export class XYK extends RuntimeModule<unknown> {
       denominatorIsSafe,
       Balance,
       denominator,
-      Balance.from(1)
+      Balance.from(1),
     );
 
     assert(denominatorIsSafe);
@@ -234,32 +230,21 @@ export class XYK extends RuntimeModule<unknown> {
     tokenIn: TokenId,
     tokenOut: TokenId,
     amountIn: Balance,
-    minAmountOut: Balance
+    minAmountOut: Balance,
   ) {
     this.assertPoolExists(tokenIn, tokenOut);
     const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
 
-    const amountOut = this.calculateTokenOutAmount(
-      tokenIn,
-      tokenOut,
-      amountIn
+    const amountOut = this.calculateTokenOutAmount(tokenIn, tokenOut, amountIn);
+
+    assert(
+      amountOut.greaterThanOrEqual(minAmountOut),
+      errors.amountOutTooLow(),
     );
 
-    assert(amountOut.greaterThanOrEqual(minAmountOut), errors.amountOutTooLow());
+    this.balances.transfer(tokenIn, this.transaction.sender, pool, amountIn);
 
-    this.balances.transfer(
-      tokenIn,
-      this.transaction.sender,
-      pool,
-      amountIn
-    );
-
-    this.balances.transfer(
-      tokenOut,
-      pool,
-      this.transaction.sender,
-      amountOut
-    );
+    this.balances.transfer(tokenOut, pool, this.transaction.sender, amountOut);
   }
 
   @runtimeMethod()
@@ -267,31 +252,17 @@ export class XYK extends RuntimeModule<unknown> {
     tokenIn: TokenId,
     tokenOut: TokenId,
     maxAmountIn: Balance,
-    amountOut: Balance
+    amountOut: Balance,
   ) {
     this.assertPoolExists(tokenIn, tokenOut);
     const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
 
-    const amountIn = this.calculateAmountIn(
-      tokenIn,
-      tokenOut,
-      amountOut
-    );
+    const amountIn = this.calculateAmountIn(tokenIn, tokenOut, amountOut);
 
     assert(amountIn.lessThanOrEqual(maxAmountIn), errors.amountInTooHigh());
 
-    this.balances.transfer(
-      tokenOut,
-      pool,
-      this.transaction.sender,
-      amountOut
-    );
+    this.balances.transfer(tokenOut, pool, this.transaction.sender, amountOut);
 
-    this.balances.transfer(
-      tokenIn,
-      this.transaction.sender,
-      pool,
-      amountIn
-    );
+    this.balances.transfer(tokenIn, this.transaction.sender, pool, amountIn);
   }
 }

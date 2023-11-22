@@ -71,7 +71,7 @@ describe("Balances", () => {
         BalancesKey.from({
           tokenId,
           address: alice,
-        })
+        }),
       );
 
       expect(block?.txs[0].status, block?.txs[0].statusMessage).toBe(true);
@@ -95,7 +95,7 @@ describe("Balances", () => {
         BalancesKey.from({
           tokenId,
           address: bob,
-        })
+        }),
       );
 
       expect(block?.txs[0].status).toBe(false);
@@ -132,7 +132,7 @@ describe("Balances", () => {
         BalancesKey.from({
           tokenId,
           address: alice,
-        })
+        }),
       );
 
       expect(block?.txs[0].status, block?.txs[0].statusMessage).toBe(true);
@@ -166,14 +166,14 @@ describe("Balances", () => {
         BalancesKey.from({
           tokenId,
           address: alice,
-        })
+        }),
       );
 
       const bobBalance = await appChain.query.runtime.Balances.balances.get(
         BalancesKey.from({
           tokenId,
           address: bob,
-        })
+        }),
       );
 
       expect(block?.txs[0].status, block?.txs[0].statusMessage).toBe(true);

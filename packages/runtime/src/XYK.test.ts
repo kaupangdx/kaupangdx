@@ -15,7 +15,7 @@ let nonce = 0;
 
 describe("xyk", () => {
   const aliceKey = PrivateKey.fromBase58(
-    "EKFEMDTUV2VJwcGmCwNKde3iE1cbu7MHhzBqTmBtGAd6PdsLTifY"
+    "EKFEMDTUV2VJwcGmCwNKde3iE1cbu7MHhzBqTmBtGAd6PdsLTifY",
   );
   const alice = aliceKey.toPublicKey();
 
@@ -37,7 +37,7 @@ describe("xyk", () => {
       new BalancesKey({
         tokenId,
         address,
-      })
+      }),
     );
   }
 
@@ -81,7 +81,7 @@ describe("xyk", () => {
       () => {
         balances.mintAdmin(tokenInId, alice, Balance.from(balanceToMint));
       },
-      { nonce }
+      { nonce },
     );
 
     await tx1.sign();
@@ -93,7 +93,7 @@ describe("xyk", () => {
       () => {
         balances.mintAdmin(tokenOutId, alice, Balance.from(balanceToMint));
       },
-      { nonce }
+      { nonce },
     );
 
     await tx2.sign();
@@ -115,10 +115,10 @@ describe("xyk", () => {
           tokenInId,
           tokenOutId,
           Balance.from(initialLiquidityA),
-          Balance.from(initialLiquidityB)
+          Balance.from(initialLiquidityB),
         );
       },
-      { nonce }
+      { nonce },
     );
 
     await tx.sign();
@@ -129,7 +129,7 @@ describe("xyk", () => {
     const balanceOut = await getBalance(tokenOutId, alice);
     const balanceLP = await getBalance(
       LPTokenId.fromTokenPair(tokenInId, tokenOutId),
-      alice
+      alice,
     );
 
     expect(balanceIn?.toBigInt()).toBe(balanceToMint - initialLiquidityA);
@@ -145,10 +145,10 @@ describe("xyk", () => {
           tokenInId,
           tokenOutId,
           Balance.from(initialLiquidityA),
-          Balance.from(initialLiquidityB)
+          Balance.from(initialLiquidityB),
         );
       },
-      { nonce }
+      { nonce },
     );
 
     await tx.sign();

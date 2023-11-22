@@ -33,7 +33,7 @@ export class Balance extends UInt64 {}
 export class Balances extends RuntimeModule<unknown> {
   @state() public balances = StateMap.from<BalancesKey, Balance>(
     BalancesKey,
-    Balance
+    Balance,
   );
 
   public constructor(@inject("Admin") public admin: Admin) {
@@ -48,7 +48,7 @@ export class Balances extends RuntimeModule<unknown> {
       balanceOption.isSome,
       Balance,
       balanceOption.value,
-      Balance.from(0)
+      Balance.from(0),
     );
   }
 
@@ -61,7 +61,7 @@ export class Balances extends RuntimeModule<unknown> {
     tokenId: TokenId,
     from: PublicKey,
     to: PublicKey,
-    amount: Balance
+    amount: Balance,
   ) {
     const fromBalance = this.getBalance(tokenId, from);
     const toBalance = this.getBalance(tokenId, to);
@@ -76,7 +76,7 @@ export class Balances extends RuntimeModule<unknown> {
       fromBalanceIsSufficient,
       Balance,
       fromBalance,
-      paddedFrombalance
+      paddedFrombalance,
     );
 
     const newFromBalance = safeFromBalance.sub(amount);
@@ -111,7 +111,7 @@ export class Balances extends RuntimeModule<unknown> {
       balanceIsSufficient,
       UInt64,
       balance,
-      balance.add(amount)
+      balance.add(amount),
     );
 
     const newBalance = paddedBalance.sub(amount);
@@ -124,7 +124,7 @@ export class Balances extends RuntimeModule<unknown> {
     tokenId: TokenId,
     from: PublicKey,
     to: PublicKey,
-    amount: Balance
+    amount: Balance,
   ) {
     assert(this.transaction.sender.equals(from), errors.senderNotFrom());
 

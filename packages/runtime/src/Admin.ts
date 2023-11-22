@@ -12,7 +12,7 @@ export class Admin extends RuntimeModule<unknown> {
     // allow setting only if empty, or if the sender is admin
     assert(
       admin.isSome.not().or(isSenderAdmin),
-      "Sender is not admin, or the admin is not empty"
+      "Sender is not admin, or the admin is not empty",
     );
 
     this.admin.set(newAdmin);
@@ -21,7 +21,7 @@ export class Admin extends RuntimeModule<unknown> {
   public isSenderAdmin(): [Bool, Option<PublicKey>] {
     const admin = this.admin.get();
     const isSenderAdmin = admin.isSome.and(
-      this.transaction.sender.equals(admin.value)
+      this.transaction.sender.equals(admin.value),
     );
 
     return [isSenderAdmin, admin];
