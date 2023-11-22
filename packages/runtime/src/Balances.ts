@@ -18,6 +18,7 @@ export const errors = {
 };
 
 export class TokenId extends Field {}
+
 export class BalancesKey extends Struct({
   tokenId: TokenId,
   address: PublicKey,
@@ -36,8 +37,20 @@ export class Balances extends RuntimeModule<unknown> {
     Balance,
   );
 
+  @state() public supply = StateMap.from<TokenId, UInt64>(TokenId, UInt64);
+
   public constructor(@inject("Admin") public admin: Admin) {
     super();
+  }
+
+  public getSupply(token: TokenId): UInt64 {
+    const supply = this.supply.get(token);
+    return Provable.if(
+        supply.isSome,
+        UInt64,
+        supply.value,
+        UInt64.zero,
+    );
   }
 
   public getBalance(tokenId: TokenId, address: PublicKey): Balance {
@@ -91,6 +104,7 @@ export class Balances extends RuntimeModule<unknown> {
     const balance = this.getBalance(tokenId, address);
     const newBalance = balance.add(amount);
     this.setBalance(tokenId, address, newBalance);
+    this.supply.set(tokenId, this.getSupply(tokenId).add(amount));
   }
 
   @runtimeMethod()
@@ -117,6 +131,8 @@ export class Balances extends RuntimeModule<unknown> {
     const newBalance = paddedBalance.sub(amount);
 
     this.setBalance(tokenId, address, newBalance);
+
+    this.supply.set(tokenId, this.getSupply(tokenId).sub(amount));
   }
 
   @runtimeMethod()
