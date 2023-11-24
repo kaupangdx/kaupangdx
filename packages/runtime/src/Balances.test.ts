@@ -21,6 +21,10 @@ describe("Balances", () => {
   const bob = bobPrivateKey.toPublicKey();
   const tokenId = TokenId.from(0);
 
+  const mintAmount = UInt64.from(1000);
+  const transferAmount = UInt64.from(100);
+  const burnAmount = UInt64.from(10);
+
   beforeAll(async () => {
     appChain = TestingAppChain.fromRuntime({
       modules: {
@@ -59,7 +63,7 @@ describe("Balances", () => {
 
     it("should mint a balance for alice, if alice is admin", async () => {
       const tx = await appChain.transaction(alice, () => {
-        balances.mintAdmin(tokenId, alice, UInt64.from(1000));
+        balances.mintAdmin(tokenId, alice, mintAmount);
       });
 
       await tx.sign();
@@ -75,12 +79,12 @@ describe("Balances", () => {
       );
 
       expect(block?.txs[0].status, block?.txs[0].statusMessage).toBe(true);
-      expect(aliceBalance?.toBigInt()).toBe(1000n);
+      expect(aliceBalance?.toBigInt()).toBe(mintAmount.toBigInt());
     });
 
     it("should not mint a balance for bob, if bob is not an admin", async () => {
       const tx = await appChain.transaction(bob, () => {
-        balances.mintAdmin(tokenId, bob, UInt64.from(1000));
+        balances.mintAdmin(tokenId, bob, mintAmount);
       });
 
       const inMemorySigner = appChain.resolveOrFail("Signer", InMemorySigner);
@@ -105,22 +109,9 @@ describe("Balances", () => {
   });
 
   describe("burn", () => {
-    const burnAmount = UInt64.from(1000);
-
-    beforeAll(async () => {
-      const tx1 = await appChain.transaction(alice, () => {
-        admin.setAdmin(alice);
-      });
-
-      await tx1.sign();
-      await tx1.send();
-
-      await appChain.produceBlock();
-    });
-
-    it("should burn a balance for alice, if alice is admin", async () => {
+    it("should burn a balance for alice", async () => {
       const tx = await appChain.transaction(alice, () => {
-        balances.burn(tokenId, alice, burnAmount);
+        balances.burn(tokenId, burnAmount);
       });
 
       await tx.sign();
@@ -136,25 +127,16 @@ describe("Balances", () => {
       );
 
       expect(block?.txs[0].status, block?.txs[0].statusMessage).toBe(true);
-      expect(aliceBalance?.toBigInt()).toBe(0n);
+      expect(aliceBalance?.toBigInt()).toBe(
+        mintAmount.sub(burnAmount).toBigInt(),
+      );
     });
   });
 
   describe("transferSigned", () => {
-    beforeAll(async () => {
-      const tx1 = await appChain.transaction(alice, () => {
-        balances.mintAdmin(tokenId, alice, UInt64.from(1000));
-      });
-
-      await tx1.sign();
-      await tx1.send();
-
-      await appChain.produceBlock();
-    });
-
     it("should transfer a balance from alice to bob", async () => {
       const tx = await appChain.transaction(alice, () => {
-        balances.transferSigned(tokenId, alice, bob, UInt64.from(500));
+        balances.transferSigned(tokenId, alice, bob, transferAmount);
       });
 
       await tx.sign();
@@ -177,24 +159,23 @@ describe("Balances", () => {
       );
 
       expect(block?.txs[0].status, block?.txs[0].statusMessage).toBe(true);
-      expect(aliceBalance?.toBigInt()).toBe(500n);
-      expect(bobBalance?.toBigInt()).toBe(500n);
+      expect(aliceBalance?.toBigInt()).toBe(
+        mintAmount.sub(burnAmount).sub(transferAmount).toBigInt(),
+      );
+      expect(bobBalance?.toBigInt()).toBe(transferAmount.toBigInt());
     });
 
     it("should not transfer a balance from alice to bob, if the transaction is not signed properly", async () => {
       const tx = await appChain.transaction(alice, () => {
-        balances.transferSigned(tokenId, alice, bob, UInt64.from(500));
+        balances.transferSigned(tokenId, alice, bob, transferAmount);
       });
 
       const inMemorySigner = appChain.resolveOrFail("Signer", InMemorySigner);
       inMemorySigner.config.signer = bobPrivateKey;
 
-      await tx.sign();
-      await tx.send();
-
       expect(async () => {
-        await appChain.produceBlock();
-      }).rejects.toThrow(/create a block with zero transactions/);
+        await tx.sign();
+      }).rejects.toThrow(/Signer didn't provide correct signature for tx/);
     });
   });
 });

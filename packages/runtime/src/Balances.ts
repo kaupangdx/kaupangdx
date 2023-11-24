@@ -45,12 +45,7 @@ export class Balances extends RuntimeModule<unknown> {
 
   public getSupply(token: TokenId): UInt64 {
     const supply = this.supply.get(token);
-    return Provable.if(
-        supply.isSome,
-        UInt64,
-        supply.value,
-        UInt64.zero,
-    );
+    return Provable.if(supply.isSome, UInt64, supply.value, UInt64.zero);
   }
 
   public getBalance(tokenId: TokenId, address: PublicKey): Balance {
@@ -104,7 +99,9 @@ export class Balances extends RuntimeModule<unknown> {
     const balance = this.getBalance(tokenId, address);
     const newBalance = balance.add(amount);
     this.setBalance(tokenId, address, newBalance);
-    this.supply.set(tokenId, this.getSupply(tokenId).add(amount));
+    const supply = this.getSupply(tokenId);
+    const newSupply = supply.add(amount);
+    this.supply.set(tokenId, newSupply);
   }
 
   @runtimeMethod()
@@ -114,9 +111,9 @@ export class Balances extends RuntimeModule<unknown> {
   }
 
   @runtimeMethod()
-  public burn(tokenId: TokenId, address: PublicKey, amount: Balance) {
-    this.admin.assertIsSenderAdmin();
-    const balance = this.getBalance(tokenId, address);
+  public burn(tokenId: TokenId, amount: Balance) {
+    const sender = this.transaction.sender;
+    const balance = this.getBalance(tokenId, sender);
 
     const balanceIsSufficient = balance.greaterThanOrEqual(amount);
     assert(balanceIsSufficient, errors.burnBalanceInsufficient());
@@ -128,11 +125,21 @@ export class Balances extends RuntimeModule<unknown> {
       balance.add(amount),
     );
 
-    const newBalance = paddedBalance.sub(amount);
+    this.setBalance(tokenId, sender, paddedBalance.sub(amount));
 
-    this.setBalance(tokenId, address, newBalance);
+    const supply = this.getSupply(tokenId);
 
-    this.supply.set(tokenId, this.getSupply(tokenId).sub(amount));
+    const supplyIsSufficient = supply.greaterThanOrEqual(amount);
+    assert(supplyIsSufficient, errors.burnBalanceInsufficient());
+
+    const paddedSupply = Provable.if(
+      supplyIsSufficient,
+      UInt64,
+      supply,
+      supply.add(amount),
+    );
+
+    this.supply.set(tokenId, paddedSupply.sub(amount));
   }
 
   @runtimeMethod()
