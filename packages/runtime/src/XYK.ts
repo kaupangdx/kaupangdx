@@ -9,6 +9,7 @@ import { StateMap, assert } from "@proto-kit/protocol";
 
 import {
   Field,
+  Bool,
   Group,
   Poseidon,
   Provable,
@@ -56,9 +57,11 @@ export class LPTokenId extends TokenId {
   }
 }
 
-export const MINIMUM_LIQUIDITY = UInt64.from(100);
+export const MINIMUM_LIQUIDITY = UInt64.from(10);
 
 export const errors = {
+  invalidLiquidityAmountProvided: () => "Invalid liquidity amount provided",
+  insufficientBalances: () => "Insufficient balances",
   tokenASupplyIsZero: () => "Token A supply is zero",
   tokenBSupplyIsZero: () => "Token B supply is zero",
   zeroAmount: () => "Cannot deposit zero amount",
@@ -111,15 +114,72 @@ export class XYK extends RuntimeModule<unknown> {
     this.balances.transfer(tokenB, creator, poolKey, tokenBSupply);
 
     const lpToken = LPTokenId.fromTokenPair(tokenA, tokenB);
-    // sqrt(supplyA, supplyB) - MINIMUM_LIQUIDITY
-    // We're dealing with uint type so modular square root should be fine
-    const liquidity = UInt64.from(
-      Field(tokenASupply.mul(tokenBSupply).toBigInt()).sqrt(),
-    ).sub(MINIMUM_LIQUIDITY);
+
+    const liquidity = this.sqrt(tokenASupply.mul(tokenBSupply));
+
+    const isAboveMinimum = liquidity.greaterThanOrEqual(MINIMUM_LIQUIDITY);
+    assert(isAboveMinimum, errors.invalidLiquidityAmountProvided());
+
+    const paddedLiquidity = Provable.if(
+      isAboveMinimum,
+      Balance,
+      liquidity,
+      liquidity.add(MINIMUM_LIQUIDITY),
+    );
+
     // Mint lp tokens to user
-    this.balances.mint(lpToken, creator, liquidity);
+    this.balances.mint(
+      lpToken,
+      creator,
+      paddedLiquidity.sub(MINIMUM_LIQUIDITY),
+    );
     // Minimum liquidity amount of  should be permanently locked away
     this.balances.mint(lpToken, PublicKey.empty(), MINIMUM_LIQUIDITY);
+  }
+
+  // babylonian method
+  public sqrt(value: Balance) {
+    const belowFour = Provable.if(
+      Balance.from(4).greaterThan(value),
+      Bool,
+      new Bool(true),
+      new Bool(false),
+    );
+
+    const returnValue = Provable.if(
+      value.greaterThan(Balance.zero).and(belowFour),
+      Balance,
+      Balance.from(1),
+      Balance.zero,
+    );
+
+    let root = value;
+    let temp = value.div(Balance.from(2)).add(Balance.from(1));
+
+    for (; temp < root; ) {
+      root = temp;
+      temp = value.div(temp).add(temp).div(Balance.from(2));
+    }
+
+    return Provable.if(belowFour, Balance, returnValue, root);
+  }
+
+  public calculateOptimalAmount(
+    amountA: Balance,
+    reserveA: Balance,
+    reserveB: Balance,
+  ) {
+    const isReserveANotZero = reserveA.greaterThan(Balance.from(0));
+    assert(isReserveANotZero); // Should never be 0
+
+    const nonZeroReserveA = Provable.if(
+      isReserveANotZero,
+      Balance,
+      reserveA,
+      Balance.from(1),
+    );
+
+    return amountA.mul(reserveB).div(nonZeroReserveA);
   }
 
   @runtimeMethod()
@@ -144,7 +204,52 @@ export class XYK extends RuntimeModule<unknown> {
     const reserveA = this.balances.getBalance(tokenA, pool);
     const reserveB = this.balances.getBalance(tokenB, pool);
 
-    const amountAOptimal = reserveA;
+    const amountBOptimal = this.calculateOptimalAmount(
+      amountADesired,
+      reserveA,
+      reserveB,
+    );
+
+    let lpToMint = Provable.if(
+      amountBOptimal
+        .greaterThanOrEqual(amountBMin)
+        .and(amountBDesired.greaterThanOrEqual(amountBOptimal)),
+      Balance,
+      Balance.from(
+        Field.from(amountADesired.mul(amountBOptimal).toBigInt()).sqrt(),
+      ),
+      Balance.from(0),
+    );
+
+    const amountAOptimal = this.calculateOptimalAmount(
+      amountBDesired,
+      reserveB,
+      reserveA,
+    );
+
+    lpToMint = Provable.if(
+      lpToMint
+        .equals(Balance.from(0))
+        .and(
+          amountAOptimal
+            .greaterThanOrEqual(amountAMin)
+            .and(amountADesired.greaterThanOrEqual(amountAOptimal)),
+        ),
+      Balance,
+      Balance.from(
+        Field.from(amountBDesired.mul(amountAOptimal).toBigInt()).sqrt(),
+      ),
+      Balance.from(0),
+    );
+
+    assert(
+      lpToMint.greaterThan(Balance.from(0)),
+      errors.insufficientBalances(),
+    );
+
+    const lpToken = LPTokenId.fromTokenPair(tokenA, tokenB);
+
+    this.balances.mint(lpToken, this.transaction.sender, lpToMint);
   }
 
   @runtimeMethod()

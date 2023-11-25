@@ -55,10 +55,9 @@ describe("xyk", () => {
       },
     });
 
-    appChain.setSigner(aliceKey);
-
     await appChain.start();
 
+    appChain.setSigner(aliceKey);
     balances = appChain.runtime.resolve("Balances");
     xyk = appChain.runtime.resolve("XYK");
     admin = appChain.runtime.resolve("Admin");
