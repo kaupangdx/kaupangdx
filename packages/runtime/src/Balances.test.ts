@@ -133,10 +133,10 @@ describe("Balances", () => {
     });
   });
 
-  describe("transferSigned", () => {
+  describe("transfer", () => {
     it("should transfer a balance from alice to bob", async () => {
       const tx = await appChain.transaction(alice, () => {
-        balances.transferSigned(tokenId, alice, bob, transferAmount);
+        balances.transfer(tokenId, bob, transferAmount);
       });
 
       await tx.sign();
@@ -167,7 +167,7 @@ describe("Balances", () => {
 
     it("should not transfer a balance from alice to bob, if the transaction is not signed properly", async () => {
       const tx = await appChain.transaction(alice, () => {
-        balances.transferSigned(tokenId, alice, bob, transferAmount);
+        balances.transfer(tokenId, bob, transferAmount);
       });
 
       const inMemorySigner = appChain.resolveOrFail("Signer", InMemorySigner);
