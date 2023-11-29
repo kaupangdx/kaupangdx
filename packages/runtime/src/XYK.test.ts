@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { TestingAppChain } from "@proto-kit/sdk";
 import { PrivateKey, PublicKey } from "o1js";
 import { Balance, Balances, BalancesKey, TokenId } from "./Balances";
-import { LPTokenId, MINIMUM_LIQUIDITY, PoolKey, XYK } from "./XYK";
+import { LPTokenId, PoolKey, XYK } from "./XYK";
 import { Admin } from "./Admin";
 
 type RuntimeModules = {
@@ -133,7 +133,9 @@ describe("xyk", () => {
 
     expect(balanceIn?.toBigInt()).toBe(balanceToMint - initialLiquidityA);
     expect(balanceOut?.toBigInt()).toBe(balanceToMint - initialLiquidityB);
-    expect(balanceLP?.toBigInt()).toBe((initialLiquidityA * initialLiquidityB) / 2n - MINIMUM_LIQUIDITY.toBigInt());
+    expect(balanceLP?.toBigInt()).toBe(
+      initialLiquidityA < initialLiquidityB ? initialLiquidityA : initialLiquidityB
+    );
   });
 
   it("should not create a pool, if one already exists", async () => {

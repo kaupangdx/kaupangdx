@@ -6,7 +6,6 @@ import {
   runtimeModule,
 } from "@proto-kit/module";
 import { StateMap, assert } from "@proto-kit/protocol";
-
 import {
   Field,
   Group,
@@ -56,8 +55,6 @@ export class LPTokenId extends TokenId {
   }
 }
 
-export const MINIMUM_LIQUIDITY = UInt64.from(10);
-
 export const errors = {
   invalidLiquidityAmountProvided: () => "Invalid liquidity amount provided",
   insufficientBalances: () => "Insufficient balances",
@@ -65,6 +62,7 @@ export const errors = {
   tokenBSupplyIsZero: () => "Token B supply is zero",
   insufficientAAmount: () => "Insufficient A amount",
   insufficientBAmount: () => "Insufficient B amount",
+  insufficientAllowance: () => "Insufficient allowance",
   zeroAmount: () => "Cannot deposit zero amount",
   poolExists: () => "Pool already exists",
   poolDoesNotExist: () => "Pool does not exist",
@@ -115,36 +113,36 @@ export class XYK extends RuntimeModule<unknown> {
     this.balances._transfer(tokenB, creator, poolKey, tokenBSupply);
 
     const lpToken = LPTokenId.fromTokenPair(tokenA, tokenB);
-
-    const liquidity = tokenASupply.mul(tokenBSupply).div(2);
-
-    const isAboveMinimum = liquidity.greaterThanOrEqual(MINIMUM_LIQUIDITY);
-    assert(isAboveMinimum, errors.invalidLiquidityAmountProvided());
-
-    const paddedLiquidity = Provable.if(
-      isAboveMinimum,
+    const liquidity = Provable.if(
+      tokenBSupply.greaterThan(tokenASupply),
       Balance,
-      liquidity,
-      liquidity.add(MINIMUM_LIQUIDITY),
+      tokenASupply,
+      tokenBSupply,
     );
 
     // Mint lp tokens to user
-    this.balances.mint(
-      lpToken,
-      creator,
-      paddedLiquidity.sub(MINIMUM_LIQUIDITY),
-    );
-    // Minimum liquidity amount of  should be permanently locked away
-    this.balances.mint(lpToken, PublicKey.empty(), MINIMUM_LIQUIDITY);
+    this.balances.mint(lpToken, creator, liquidity);
   }
 
-  public calculateOptimalAmount(
+  @runtimeMethod()
+  public addLiquidity(
+    tokenA: TokenId,
+    tokenB: TokenId,
     amountA: Balance,
-    reserveA: Balance,
-    reserveB: Balance,
+    amountBMax: Balance,
   ) {
+    this.assertPoolExists(tokenA, tokenB);
+    const pool = PoolKey.fromTokenPair(tokenA, tokenB);
+
+    assert(amountA.greaterThan(UInt64.zero));
+
+    // Reserves cannot be zero due to pool creation and removal flow
+    const reserveA = this.balances.getBalance(tokenA, pool);
+    const reserveB = this.balances.getBalance(tokenB, pool);
+
+    // Zero division protection
     const isReserveANotZero = reserveA.greaterThan(Balance.from(0));
-    assert(isReserveANotZero); // Should never be 0
+    assert(isReserveANotZero); // should never be zero if we delete the pool on complete liquidity removal
 
     const nonZeroReserveA = Provable.if(
       isReserveANotZero,
@@ -153,73 +151,59 @@ export class XYK extends RuntimeModule<unknown> {
       Balance.from(1),
     );
 
-    return amountA.mul(reserveB).div(nonZeroReserveA);
-  }
-
-  @runtimeMethod()
-  public addLiquidity(
-    tokenA: TokenId,
-    tokenB: TokenId,
-    amountADesired: Balance,
-    amountBDesired: Balance,
-    amountAMin: Balance,
-    amountBMin: Balance,
-  ) {
-    this.assertPoolExists(tokenA, tokenB);
-    const pool = PoolKey.fromTokenPair(tokenA, tokenB);
-
-    // Amount assertions
-    assert(amountAMin.greaterThan(UInt64.zero));
-    assert(amountBMin.greaterThan(UInt64.zero));
-    assert(amountADesired.greaterThanOrEqual(amountAMin));
-    assert(amountBDesired.greaterThanOrEqual(amountBMin));
-
-    // Reserves cannot be zero due to pool creation and constant product invariant
-    const reserveA = this.balances.getBalance(tokenA, pool);
-    const reserveB = this.balances.getBalance(tokenB, pool);
-
-    const amountBOptimal = this.calculateOptimalAmount(
-      amountADesired,
-      reserveA,
-      reserveB,
-    );
-
-    let lpToMint = Provable.if(
-      amountBOptimal
-        .greaterThanOrEqual(amountBMin)
-        .and(amountBDesired.greaterThanOrEqual(amountBOptimal)),
-      Balance,
-      amountADesired.mul(amountBOptimal).div(2),
-      Balance.from(0),
-    );
-
-    const amountAOptimal = this.calculateOptimalAmount(
-      amountBDesired,
-      reserveB,
-      reserveA,
-    );
-
-    lpToMint = Provable.if(
-      lpToMint
-        .equals(Balance.from(0))
-        .and(
-          amountAOptimal
-            .greaterThanOrEqual(amountAMin)
-            .and(amountADesired.greaterThanOrEqual(amountAOptimal)),
-        ),
-      Balance,
-      amountBDesired.mul(amountAOptimal).div(2),
-      Balance.from(0),
-    );
-
+    const amountB = amountA.mul(reserveB).div(nonZeroReserveA);
     assert(
-      lpToMint.greaterThan(Balance.from(0)),
+      amountBMax.greaterThanOrEqual(amountB),
+      errors.insufficientAllowance(),
+    );
+
+    const sender = this.transaction.sender;
+
+    const senderBalanceA = this.balances.getBalance(tokenA, sender);
+    const senderBalanceB = this.balances.getBalance(tokenB, sender);
+
+    const balanceASufficiency = senderBalanceA.greaterThanOrEqual(amountA);
+    const balanceBSufficiency = senderBalanceB.greaterThanOrEqual(amountB);
+    assert(
+      balanceASufficiency.and(balanceBSufficiency),
       errors.insufficientBalances(),
     );
 
+    const safeSenderBalanceA = Provable.if(
+      balanceASufficiency,
+      Balance,
+      senderBalanceA,
+      senderBalanceA.add(amountA),
+    );
+
+    const safeSenderBalanceB = Provable.if(
+      balanceBSufficiency,
+      Balance,
+      senderBalanceB,
+      senderBalanceB.add(amountB),
+    );
+
+    this.balances.setBalance(tokenA, sender, safeSenderBalanceA.sub(amountA));
+    this.balances.setBalance(tokenB, sender, safeSenderBalanceB.sub(amountB));
+
+    this.balances.setBalance(tokenA, pool, reserveA.add(amountA));
+    this.balances.setBalance(tokenB, pool, reserveB.add(amountB));
+
     const lpToken = LPTokenId.fromTokenPair(tokenA, tokenB);
 
-    this.balances.mint(lpToken, this.transaction.sender, lpToMint);
+    const totalSupply = this.balances.getSupply(lpToken);
+
+    const liqA = amountA.mul(totalSupply).div(reserveA);
+    const liqB = amountB.mul(totalSupply).div(reserveB);
+
+    const liquidity = Provable.if(liqB.greaterThan(liqA), Balance, liqA, liqB);
+
+    assert(
+      liquidity.greaterThan(Balance.from(0)),
+      errors.insufficientBalances(),
+    );
+
+    this.balances.mint(lpToken, this.transaction.sender, liquidity);
   }
 
   @runtimeMethod()
@@ -246,8 +230,14 @@ export class XYK extends RuntimeModule<unknown> {
     const amountA = liquidity.mul(reserveA).div(totalSupply);
     const amountB = liquidity.mul(reserveB).div(totalSupply);
 
-    assert(amountA.greaterThanOrEqual(amountAMin), errors.insufficientAAmount());
-    assert(amountB.greaterThanOrEqual(amountBMin), errors.insufficientBAmount());
+    assert(
+      amountA.greaterThanOrEqual(amountAMin),
+      errors.insufficientAAmount(),
+    );
+    assert(
+      amountB.greaterThanOrEqual(amountBMin),
+      errors.insufficientBAmount(),
+    );
 
     const sender = this.transaction.sender;
     this.balances.setBalance(
@@ -260,6 +250,24 @@ export class XYK extends RuntimeModule<unknown> {
       sender,
       this.balances.getBalance(tokenB, sender).add(amountB),
     );
+
+    const paddedReserveA = Provable.if(
+      reserveA.greaterThanOrEqual(amountA),
+      Balance,
+      reserveA,
+      reserveA.add(amountA),
+    );
+
+    const paddedReserveB = Provable.if(
+      reserveB.greaterThanOrEqual(amountB),
+      Balance,
+      reserveB,
+      reserveB.add(amountB),
+    );
+
+    this.balances.setBalance(tokenA, pool, paddedReserveA.sub(amountA));
+    this.balances.setBalance(tokenB, pool, paddedReserveB.sub(amountB));
+    // TODO: Check if pool resrves are empty and delete the pool if so
   }
 
   public calculateTokenOutAmount(
