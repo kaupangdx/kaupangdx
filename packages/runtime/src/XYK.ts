@@ -193,8 +193,18 @@ export class XYK extends RuntimeModule<unknown> {
 
     const totalSupply = this.balances.getSupply(lpToken);
 
-    const liqA = amountA.mul(totalSupply).div(reserveA);
-    const liqB = amountB.mul(totalSupply).div(reserveB);
+    const liqA = amountA.mul(totalSupply).div(nonZeroReserveA);
+
+    const isReserveBNotZero = reserveB.greaterThan(Balance.from(0));
+    assert(isReserveBNotZero);
+
+    const nonZeroReserveB = Provable.if(
+      isReserveBNotZero,
+      Balance,
+      reserveB,
+      Balance.from(1),
+    );
+    const liqB = amountB.mul(totalSupply).div(nonZeroReserveB);
 
     const liquidity = Provable.if(liqB.greaterThan(liqA), Balance, liqA, liqB);
 
