@@ -56,6 +56,8 @@ export class LPTokenId extends TokenId {
 }
 
 export const errors = {
+  subtractionUnderflow: () => "Subtraction underflow",
+  divisionByZero: () => "Division by zero",
   invalidLiquidityAmountProvided: () => "Invalid liquidity amount provided",
   insufficientBalances: () => "Insufficient balances",
   tokenASupplyIsZero: () => "Token A supply is zero",
@@ -140,18 +142,7 @@ export class XYK extends RuntimeModule<unknown> {
     const reserveA = this.balances.getBalance(tokenA, pool);
     const reserveB = this.balances.getBalance(tokenB, pool);
 
-    // Zero division protection
-    const isReserveANotZero = reserveA.greaterThan(Balance.from(0));
-    assert(isReserveANotZero); // should never be zero if we delete the pool on complete liquidity removal
-
-    const nonZeroReserveA = Provable.if(
-      isReserveANotZero,
-      Balance,
-      reserveA,
-      Balance.from(1),
-    );
-
-    const amountB = amountA.mul(reserveB).div(nonZeroReserveA);
+    const amountB = this.safeDiv(amountA.mul(reserveB), reserveA);
     assert(
       amountBMax.greaterThanOrEqual(amountB),
       errors.insufficientAllowance(),
@@ -162,29 +153,16 @@ export class XYK extends RuntimeModule<unknown> {
     const senderBalanceA = this.balances.getBalance(tokenA, sender);
     const senderBalanceB = this.balances.getBalance(tokenB, sender);
 
-    const balanceASufficiency = senderBalanceA.greaterThanOrEqual(amountA);
-    const balanceBSufficiency = senderBalanceB.greaterThanOrEqual(amountB);
-    assert(
-      balanceASufficiency.and(balanceBSufficiency),
-      errors.insufficientBalances(),
+    this.balances.setBalance(
+      tokenA,
+      sender,
+      this.safeSub(senderBalanceA, amountA),
     );
-
-    const safeSenderBalanceA = Provable.if(
-      balanceASufficiency,
-      Balance,
-      senderBalanceA,
-      senderBalanceA.add(amountA),
+    this.balances.setBalance(
+      tokenB,
+      sender,
+      this.safeSub(senderBalanceB, amountB),
     );
-
-    const safeSenderBalanceB = Provable.if(
-      balanceBSufficiency,
-      Balance,
-      senderBalanceB,
-      senderBalanceB.add(amountB),
-    );
-
-    this.balances.setBalance(tokenA, sender, safeSenderBalanceA.sub(amountA));
-    this.balances.setBalance(tokenB, sender, safeSenderBalanceB.sub(amountB));
 
     this.balances.setBalance(tokenA, pool, reserveA.add(amountA));
     this.balances.setBalance(tokenB, pool, reserveB.add(amountB));
@@ -193,18 +171,9 @@ export class XYK extends RuntimeModule<unknown> {
 
     const totalSupply = this.balances.getSupply(lpToken);
 
-    const liqA = amountA.mul(totalSupply).div(nonZeroReserveA);
+    const liqA = this.safeDiv(amountA.mul(totalSupply), reserveA);
 
-    const isReserveBNotZero = reserveB.greaterThan(Balance.from(0));
-    assert(isReserveBNotZero);
-
-    const nonZeroReserveB = Provable.if(
-      isReserveBNotZero,
-      Balance,
-      reserveB,
-      Balance.from(1),
-    );
-    const liqB = amountB.mul(totalSupply).div(nonZeroReserveB);
+    const liqB = this.safeDiv(amountB.mul(totalSupply), reserveB);
 
     const liquidity = Provable.if(liqB.greaterThan(liqA), Balance, liqA, liqB);
 
@@ -235,7 +204,9 @@ export class XYK extends RuntimeModule<unknown> {
     const reserveA = this.balances.getBalance(tokenA, pool);
     const reserveB = this.balances.getBalance(tokenB, pool);
 
-    const totalSupply = this.balances.getSupply(lpToken);
+    const totalSupply = this.getSafeDenominator(
+      this.balances.getSupply(lpToken),
+    );
 
     const amountA = liquidity.mul(reserveA).div(totalSupply);
     const amountB = liquidity.mul(reserveB).div(totalSupply);
@@ -261,22 +232,8 @@ export class XYK extends RuntimeModule<unknown> {
       this.balances.getBalance(tokenB, sender).add(amountB),
     );
 
-    const paddedReserveA = Provable.if(
-      reserveA.greaterThanOrEqual(amountA),
-      Balance,
-      reserveA,
-      reserveA.add(amountA),
-    );
-
-    const paddedReserveB = Provable.if(
-      reserveB.greaterThanOrEqual(amountB),
-      Balance,
-      reserveB,
-      reserveB.add(amountB),
-    );
-
-    this.balances.setBalance(tokenA, pool, paddedReserveA.sub(amountA));
-    this.balances.setBalance(tokenB, pool, paddedReserveB.sub(amountB));
+    this.balances.setBalance(tokenA, pool, this.safeSub(reserveA, amountA));
+    this.balances.setBalance(tokenB, pool, this.safeSub(reserveB, amountB));
     // TODO: Check if pool resrves are empty and delete the pool if so
   }
 
@@ -326,30 +283,10 @@ export class XYK extends RuntimeModule<unknown> {
     reserveOut: Balance,
     amountOut: Balance,
   ) {
-    const paddedTokenOutReserve = reserveOut.add(amountOut);
-    const reserveOutIsSufficient = reserveOut.greaterThanOrEqual(amountOut);
-
-    const safeTokenOutReserve = Provable.if(
-      reserveOutIsSufficient,
-      Balance,
-      reserveOut,
-      paddedTokenOutReserve,
-    );
-
     const numerator = reserveIn.mul(amountOut);
-    const denominator = safeTokenOutReserve.sub(amountOut);
+    const denominator = this.safeSub(reserveOut, amountOut);
 
-    const denominatorIsSafe = denominator.greaterThan(Balance.from(0));
-    const safeDenominator = Provable.if(
-      denominatorIsSafe,
-      Balance,
-      denominator,
-      Balance.from(1),
-    );
-
-    assert(denominatorIsSafe);
-
-    return numerator.div(safeDenominator);
+    return this.safeDiv(numerator, denominator);
   }
 
   @runtimeMethod()
@@ -389,5 +326,36 @@ export class XYK extends RuntimeModule<unknown> {
 
     this.balances._transfer(tokenOut, pool, this.transaction.sender, amountOut);
     this.balances._transfer(tokenIn, this.transaction.sender, pool, amountIn);
+  }
+
+  public safeSub(minuend: UInt64, subtrahend: UInt64): UInt64 {
+    const minuendSufficiency = minuend.greaterThanOrEqual(subtrahend);
+    assert(minuendSufficiency, errors.subtractionUnderflow());
+
+    const safeMinuend = Provable.if(
+      minuendSufficiency,
+      UInt64,
+      minuend,
+      minuend.add(subtrahend),
+    );
+
+    return safeMinuend.sub(subtrahend);
+  }
+
+  public safeDiv(numerator: UInt64, denominator: UInt64): UInt64 {
+    const safeDenominator = this.getSafeDenominator(denominator);
+    return numerator.div(safeDenominator);
+  }
+
+  public getSafeDenominator(denominator: UInt64): UInt64 {
+    const isDenominatorNotZero = denominator.equals(UInt64.zero).not();
+    assert(isDenominatorNotZero, errors.divisionByZero());
+
+    return Provable.if(
+      isDenominatorNotZero,
+      UInt64,
+      denominator,
+      UInt64.from(1),
+    );
   }
 }
