@@ -168,11 +168,9 @@ export class XYK extends RuntimeModule<unknown> {
     this.balances.setBalance(tokenB, pool, reserveB.add(amountB));
 
     const lpToken = LPTokenId.fromTokenPair(tokenA, tokenB);
-
     const totalSupply = this.balances.getSupply(lpToken);
 
     const liqA = this.safeDiv(amountA.mul(totalSupply), reserveA);
-
     const liqB = this.safeDiv(amountB.mul(totalSupply), reserveB);
 
     const liquidity = Provable.if(liqB.greaterThan(liqA), Balance, liqA, liqB);
@@ -198,7 +196,6 @@ export class XYK extends RuntimeModule<unknown> {
 
     // Burn the lp
     const lpToken = LPTokenId.fromTokenPair(tokenA, tokenB);
-    this.balances.burn(lpToken, liquidity);
 
     // Get reserves
     const reserveA = this.balances.getBalance(tokenA, pool);
@@ -234,7 +231,9 @@ export class XYK extends RuntimeModule<unknown> {
 
     this.balances.setBalance(tokenA, pool, this.safeSub(reserveA, amountA));
     this.balances.setBalance(tokenB, pool, this.safeSub(reserveB, amountB));
-    // TODO: Check if pool resrves are empty and delete the pool if so
+    // Burn sender's lp tokens
+    this.balances.burn(lpToken, liquidity);
+    // TODO: Check if pool reserves are empty and delete the pool if so
   }
 
   public calculateTokenOutAmount(
