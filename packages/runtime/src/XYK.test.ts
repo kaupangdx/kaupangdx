@@ -162,57 +162,92 @@ describe("xyk", () => {
     expect(block?.txs[0].statusMessage).toMatch(/Pool already exists/);
   });
 
-  it("should add liquidity", async () => {
-    const amountA = Balance.from(initialLiquidityA / 2n);
-    const amountBMax = Balance.from(initialLiquidityB / 2n + 100n);
-    // Pool has just been created so the lp supply and amountB can be calculated like this
-    // also at this point total supply and alice's balance are the same thing
-    const initialBalanceLP = Balance.from(
-      initialLiquidityA > initialLiquidityB
-        ? initialLiquidityB
-        : initialLiquidityA,
-    );
-    const amountB = amountA
-      .mul(Balance.from(initialLiquidityB))
-      .div(Balance.from(initialLiquidityA));
+  describe("liquidity management", () => {
+    let lpAddition: Balance, amountA: Balance, amountB: Balance, initialBalanceLP: Balance;
 
-    const liqA = amountA
-      .mul(initialBalanceLP)
-      .div(Balance.from(initialLiquidityA));
-    const liqB = amountB
-      .mul(initialBalanceLP)
-      .div(Balance.from(initialLiquidityB));
+    it("should add liquidity", async () => {
+      amountA = Balance.from(initialLiquidityA / 2n);
+      const amountBMax = Balance.from(initialLiquidityB / 2n + 100n);
+      // Pool has just been created so the lp supply and amountB can be calculated like this
+      // also at this point total supply and alice's balance are the same thing
+      initialBalanceLP = Balance.from(
+        initialLiquidityA > initialLiquidityB
+          ? initialLiquidityB
+          : initialLiquidityA,
+      );
+      amountB = amountA
+        .mul(Balance.from(initialLiquidityB))
+        .div(Balance.from(initialLiquidityA));
 
-    const lpAddition = liqA.toBigInt() > liqB.toBigInt() ? liqB : liqA;
+      const liqA = amountA
+        .mul(initialBalanceLP)
+        .div(Balance.from(initialLiquidityA));
+      const liqB = amountB
+        .mul(initialBalanceLP)
+        .div(Balance.from(initialLiquidityB));
 
-    const tx = await appChain.transaction(
-      alice,
-      () => {
-        xyk.addLiquidity(tokenA, tokenB, amountA, amountBMax);
-        //amountBMax should be slightly above needed amount since inital setup provides token price ratio of 1:2 A:B
-      },
-      { nonce },
-    );
+      lpAddition = liqA.toBigInt() > liqB.toBigInt() ? liqB : liqA;
 
-    await tx.sign();
-    await tx.send();
-    await appChain.produceBlock();
+      const tx = await appChain.transaction(
+        alice,
+        () => {
+          xyk.addLiquidity(tokenA, tokenB, amountA, amountBMax);
+          //amountBMax should be slightly above needed amount since inital setup provides token price ratio of 1:2 A:B
+        },
+        { nonce },
+      );
 
-    const balanceA = await getBalance(tokenA, alice);
-    const balanceB = await getBalance(tokenB, alice);
-    const balanceLP = await getBalance(
-      LPTokenId.fromTokenPair(tokenA, tokenB),
-      alice,
-    );
+      await tx.sign();
+      await tx.send();
+      await appChain.produceBlock();
 
-    expect(balanceA?.toBigInt()).toBe(
-      balanceToMint - initialLiquidityA - amountA.toBigInt(),
-    );
-    expect(balanceB?.toBigInt()).toBe(
-      balanceToMint - initialLiquidityB - amountB.toBigInt(),
-    );
-    expect(balanceLP?.toBigInt()).toBe(
-      initialBalanceLP.add(lpAddition).toBigInt(),
-    );
+      const balanceA = await getBalance(tokenA, alice);
+      const balanceB = await getBalance(tokenB, alice);
+      const balanceLP = await getBalance(
+        LPTokenId.fromTokenPair(tokenA, tokenB),
+        alice,
+      );
+
+      expect(balanceA?.toBigInt()).toBe(
+        balanceToMint - initialLiquidityA - amountA.toBigInt(),
+      );
+      expect(balanceB?.toBigInt()).toBe(
+        balanceToMint - initialLiquidityB - amountB.toBigInt(),
+      );
+      expect(balanceLP?.toBigInt()).toBe(
+        initialBalanceLP.add(lpAddition).toBigInt(),
+      );
+    });
+
+    it("should remove liquidity", async () => {
+      const tx = await appChain.transaction(
+        alice,
+        () => {
+          xyk.removeLiquidity(tokenA, tokenB, lpAddition, amountA, amountB);
+        },
+        { nonce },
+      );
+
+      await tx.sign();
+      await tx.send();
+      await appChain.produceBlock();
+
+      const balanceA = await getBalance(tokenA, alice);
+      const balanceB = await getBalance(tokenB, alice);
+      const balanceLP = await getBalance(
+        LPTokenId.fromTokenPair(tokenA, tokenB),
+        alice,
+      );
+
+      expect(balanceA?.toBigInt()).toBe(
+        balanceToMint - initialLiquidityA,
+      );
+      expect(balanceB?.toBigInt()).toBe(
+        balanceToMint - initialLiquidityB,
+      );
+      expect(balanceLP?.toBigInt()).toBe(
+        initialBalanceLP.toBigInt()
+      );
+    });
   });
 });
