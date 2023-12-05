@@ -71,7 +71,8 @@ describe("xyk", () => {
     await tx.sign();
     await tx.send();
 
-    await appChain.produceBlock();
+    const block = await appChain.produceBlock();
+    expect(block?.txs[0].status).toBe(true);
   });
 
   it("should mint balance for alice", async () => {
@@ -85,7 +86,9 @@ describe("xyk", () => {
 
     await tx1.sign();
     await tx1.send();
-    await appChain.produceBlock();
+    const block1 = await appChain.produceBlock();
+
+    expect(block1?.txs[0].status).toBe(true);
 
     const tx2 = await appChain.transaction(
       alice,
@@ -97,7 +100,9 @@ describe("xyk", () => {
 
     await tx2.sign();
     await tx2.send();
-    await appChain.produceBlock();
+    const block2 = await appChain.produceBlock();
+
+    expect(block2?.txs[0].status).toBe(true);
 
     const balanceIn = await getBalance(tokenA, alice);
     const balanceOut = await getBalance(tokenB, alice);
@@ -122,7 +127,9 @@ describe("xyk", () => {
 
     await tx.sign();
     await tx.send();
-    await appChain.produceBlock();
+    const block = await appChain.produceBlock();
+
+    expect(block?.txs[0].status).toBe(true);
 
     const balanceIn = await getBalance(tokenA, alice);
     const balanceOut = await getBalance(tokenB, alice);
@@ -199,7 +206,9 @@ describe("xyk", () => {
 
       await tx.sign();
       await tx.send();
-      await appChain.produceBlock();
+      const block = await appChain.produceBlock();
+
+      expect(block?.txs[0].status).toBe(true);
 
       const balanceA = await getBalance(tokenA, alice);
       const balanceB = await getBalance(tokenB, alice);
@@ -230,7 +239,9 @@ describe("xyk", () => {
 
       await tx.sign();
       await tx.send();
-      await appChain.produceBlock();
+      const block = await appChain.produceBlock();
+
+      expect(block?.txs[0].status).toBe(true);
 
       const balanceA = await getBalance(tokenA, alice);
       const balanceB = await getBalance(tokenB, alice);
