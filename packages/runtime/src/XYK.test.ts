@@ -283,6 +283,9 @@ describe("xyk", () => {
     });
 
     describe("swap", () => {
+      let aliceBalanceA = balanceToMint - initialLiquidityA;
+      let aliceBalanceB = balanceToMint - initialLiquidityB;
+
       it("should swap exact A for B", async () => {
         const amountIn = 100n;
         const amountOut = (amountIn * reserveB) / (amountIn + reserveA); //minAmountOut but is exact amount out
@@ -305,15 +308,52 @@ describe("xyk", () => {
 
         expect(block?.txs[0].status).toBe(true);
 
+        aliceBalanceA -= amountIn;
+        aliceBalanceB += amountOut;
+
+        // Get live balances of Alice
         const balanceA = await getBalance(tokenA, alice);
         const balanceB = await getBalance(tokenB, alice);
 
-        expect(balanceA?.toBigInt()).toBe(
-          balanceToMint - initialLiquidityA - amountIn,
+        expect(balanceA?.toBigInt()).toBe(aliceBalanceA);
+        expect(balanceB?.toBigInt()).toBe(aliceBalanceB);
+
+        reserveA += amountIn;
+        reserveB -= amountOut;
+      });
+
+      it("should swap A for exact B", async () => {
+        const amountInMax = 100n;
+        const amountOut = 150n;
+        const amountIn = (amountOut * reserveA) / (reserveB - amountOut);
+        const tx = await appChain.transaction(
+          alice,
+          () => {
+            xyk.swapTokensForExactTokens(
+              tokenA,
+              tokenB,
+              Balance.from(amountInMax),
+              Balance.from(amountOut),
+            );
+          },
+          { nonce },
         );
-        expect(balanceB?.toBigInt()).toBe(
-          balanceToMint - initialLiquidityB + amountOut,
-        );
+
+        await tx.sign();
+        await tx.send();
+        const block = await appChain.produceBlock();
+
+        expect(block?.txs[0].status).toBe(true);
+
+        aliceBalanceA -= amountIn;
+        aliceBalanceB += amountOut;
+
+        const balanceA = await getBalance(tokenA, alice);
+        const balanceB = await getBalance(tokenB, alice);
+
+        expect(balanceA?.toBigInt()).toBe(aliceBalanceA);
+
+        expect(balanceB?.toBigInt()).toBe(aliceBalanceB);
 
         reserveA += amountIn;
         reserveB -= amountOut;
