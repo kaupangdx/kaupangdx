@@ -55,6 +55,10 @@ export class LPTokenId extends TokenId {
   }
 }
 
+export class Path extends Struct({
+    tokens: Provable.Array(TokenId, 10)
+}) {}
+
 export const errors = {
   subtractionUnderflow: () => "Subtraction underflow",
   divisionByZero: () => "Division by zero",
@@ -290,41 +294,41 @@ export class XYK extends RuntimeModule<unknown> {
 
   @runtimeMethod()
   public swapExactTokensForTokens(
-    tokenIn: TokenId,
-    tokenOut: TokenId,
     amountIn: Balance,
     minAmountOut: Balance,
+    path: Path
   ) {
-    this.assertPoolExists(tokenIn, tokenOut);
+    const tokens = path.tokens;
+    this.assertPoolExists(tokens[0], tokens[1]);
 
-    const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
-    const amountOut = this.calculateTokenOutAmount(tokenIn, tokenOut, amountIn);
+    const pool = PoolKey.fromTokenPair(tokens[0], tokens[1]);
+    const amountOut = this.calculateTokenOutAmount(tokens[0], tokens[1], amountIn);
 
     assert(
       amountOut.greaterThanOrEqual(minAmountOut),
       errors.amountOutTooLow(),
     );
 
-    this.balances._transfer(tokenIn, this.transaction.sender, pool, amountIn);
-    this.balances._transfer(tokenOut, pool, this.transaction.sender, amountOut);
+    this.balances._transfer(tokens[0], this.transaction.sender, pool, amountIn);
+    this.balances._transfer(tokens[1], pool, this.transaction.sender, amountOut);
   }
 
   @runtimeMethod()
   public swapTokensForExactTokens(
-    tokenIn: TokenId,
-    tokenOut: TokenId,
     maxAmountIn: Balance,
     amountOut: Balance,
+    path: Path
   ) {
-    this.assertPoolExists(tokenIn, tokenOut);
+    const tokens = path.tokens;
+    this.assertPoolExists(tokens[0], tokens[1]);
 
-    const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
-    const amountIn = this.calculateAmountIn(tokenIn, tokenOut, amountOut);
+    const pool = PoolKey.fromTokenPair(tokens[0], tokens[1]);
+    const amountIn = this.calculateAmountIn(tokens[0], tokens[1], amountOut);
 
     assert(amountIn.lessThanOrEqual(maxAmountIn), errors.amountInTooHigh());
 
-    this.balances._transfer(tokenOut, pool, this.transaction.sender, amountOut);
-    this.balances._transfer(tokenIn, this.transaction.sender, pool, amountIn);
+    this.balances._transfer(tokens[1], pool, this.transaction.sender, amountOut);
+    this.balances._transfer(tokens[0], this.transaction.sender, pool, amountIn);
   }
 
   public safeSub(minuend: UInt64, subtrahend: UInt64): UInt64 {

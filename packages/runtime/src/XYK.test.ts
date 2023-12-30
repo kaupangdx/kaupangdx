@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { TestingAppChain } from "@proto-kit/sdk";
 import { PrivateKey, PublicKey } from "o1js";
 import { Balance, Balances, BalancesKey, TokenId } from "./Balances";
-import { LPTokenId, PoolKey, XYK } from "./XYK";
+import { LPTokenId, PoolKey, XYK, Path } from "./XYK";
 import { Admin } from "./Admin";
 
 type RuntimeModules = {
@@ -293,10 +293,11 @@ describe("xyk", () => {
           alice,
           () => {
             xyk.swapExactTokensForTokens(
-              tokenA,
-              tokenB,
               Balance.from(amountIn),
               Balance.from(amountOut),
+              new Path({
+                tokens: [tokenA, tokenB]
+              })
             );
           },
           { nonce },
@@ -330,10 +331,11 @@ describe("xyk", () => {
           alice,
           () => {
             xyk.swapTokensForExactTokens(
-              tokenA,
-              tokenB,
               Balance.from(amountInMax),
               Balance.from(amountOut),
+              new Path({
+                tokens: [tokenA, tokenB]
+              })
             );
           },
           { nonce },
