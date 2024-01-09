@@ -296,8 +296,8 @@ describe("xyk", () => {
               Balance.from(amountIn),
               Balance.from(amountOut),
               new Path({
-                tokens: [tokenA, tokenB]
-              })
+                tokens: [tokenA, tokenB],
+              }),
             );
           },
           { nonce },
@@ -334,8 +334,8 @@ describe("xyk", () => {
               Balance.from(amountInMax),
               Balance.from(amountOut),
               new Path({
-                tokens: [tokenA, tokenB]
-              })
+                tokens: [tokenA, tokenB],
+              }),
             );
           },
           { nonce },

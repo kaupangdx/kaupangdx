@@ -56,7 +56,7 @@ export class LPTokenId extends TokenId {
 }
 
 export class Path extends Struct({
-    tokens: Provable.Array(TokenId, 10)
+  tokens: Provable.Array(TokenId, 10),
 }) {}
 
 export const errors = {
@@ -296,39 +296,71 @@ export class XYK extends RuntimeModule<unknown> {
   public swapExactTokensForTokens(
     amountIn: Balance,
     minAmountOut: Balance,
-    path: Path
+    path: Path,
   ) {
     const tokens = path.tokens;
-    this.assertPoolExists(tokens[0], tokens[1]);
 
-    const pool = PoolKey.fromTokenPair(tokens[0], tokens[1]);
-    const amountOut = this.calculateTokenOutAmount(tokens[0], tokens[1], amountIn);
+    assert(minAmountOut.greaterThanOrEqual(Balance.from(0)));
 
+    let amountOut = Balance.from(0);
+    let pool = PoolKey.empty();
+    let sender = this.transaction.sender;
+    let tokenOut = TokenId.from(0);
+
+    for (let i = 0; i < tokens.length - 1; i++) {
+      const tokenIn = tokens[i];
+      tokenOut = tokens[i + 1];
+
+      this.assertPoolExists(tokenIn, tokenOut);
+
+      pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
+      amountOut = this.calculateTokenOutAmount(tokenIn, tokenOut, amountIn);
+
+      this.balances._transfer(tokenIn, sender, pool, amountIn);
+
+      sender = pool;
+      amountIn = amountOut;
+    }
+    assert(pool.isEmpty().not());
     assert(
       amountOut.greaterThanOrEqual(minAmountOut),
       errors.amountOutTooLow(),
     );
-
-    this.balances._transfer(tokens[0], this.transaction.sender, pool, amountIn);
-    this.balances._transfer(tokens[1], pool, this.transaction.sender, amountOut);
+    this.balances._transfer(tokenOut, pool, this.transaction.sender, amountOut);
   }
 
   @runtimeMethod()
   public swapTokensForExactTokens(
     maxAmountIn: Balance,
     amountOut: Balance,
-    path: Path
+    path: Path,
   ) {
     const tokens = path.tokens;
-    this.assertPoolExists(tokens[0], tokens[1]);
 
-    const pool = PoolKey.fromTokenPair(tokens[0], tokens[1]);
-    const amountIn = this.calculateAmountIn(tokens[0], tokens[1], amountOut);
+    assert(maxAmountIn.greaterThan(Balance.from(0)));
 
+    let amountIn = Balance.from(0);
+    let pool = PoolKey.empty();
+    let receiver = this.transaction.sender;
+    let tokenIn = TokenId.from(0);
+
+    for (let i = tokens.length - 1; i > 0; i--) {
+      tokenIn = tokens[i - 1];
+      const tokenOut = tokens[i];
+
+      this.assertPoolExists(tokenIn, tokenOut);
+
+      pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
+      amountIn = this.calculateAmountIn(tokenIn, tokenOut, amountOut);
+
+      this.balances._transfer(tokenOut, pool, receiver, amountOut);
+
+      receiver = pool;
+      amountOut = amountIn;
+    }
+    assert(pool.isEmpty().not());
     assert(amountIn.lessThanOrEqual(maxAmountIn), errors.amountInTooHigh());
-
-    this.balances._transfer(tokens[1], pool, this.transaction.sender, amountOut);
-    this.balances._transfer(tokens[0], this.transaction.sender, pool, amountIn);
+    this.balances._transfer(tokenIn, this.transaction.sender, pool, amountIn);
   }
 
   public safeSub(minuend: UInt64, subtrahend: UInt64): UInt64 {
