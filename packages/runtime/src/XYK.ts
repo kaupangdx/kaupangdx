@@ -306,6 +306,9 @@ export class XYK extends RuntimeModule<unknown> {
     let sender = this.transaction.sender;
     let tokenOut = TokenId.from(0);
 
+    // Flow which iteratively swaps tokens across multiple pools until the
+    // end of the path has been reached [0..path.length-1] and the amountOut
+    // is known and greater than minAmountIn
     for (let i = 0; i < path.length - 1; i++) {
       const tokenIn = path[i];
       tokenOut = path[i + 1];
@@ -342,6 +345,9 @@ export class XYK extends RuntimeModule<unknown> {
     let receiver = this.transaction.sender;
     let tokenIn = TokenId.from(0);
 
+    // Flow which iteratively swaps tokens in reverse across multiple pools
+    // until the beggining of the path has been reached [path.length-1..0]
+    // and amountIn is known and lower than maxAmountIn
     for (let i = path.length - 1; i > 0; i--) {
       tokenIn = path[i - 1];
       const tokenOut = path[i];
