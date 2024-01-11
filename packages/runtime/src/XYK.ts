@@ -60,16 +60,15 @@ export class WrappedPath extends Struct({
 }) {}
 
 export const errors = {
+  invalidPath: () => "Invalid path",
   subtractionUnderflow: () => "Subtraction underflow",
   divisionByZero: () => "Division by zero",
-  invalidLiquidityAmountProvided: () => "Invalid liquidity amount provided",
   insufficientBalances: () => "Insufficient balances",
   tokenASupplyIsZero: () => "Token A supply is zero",
   tokenBSupplyIsZero: () => "Token B supply is zero",
   insufficientAAmount: () => "Insufficient A amount",
   insufficientBAmount: () => "Insufficient B amount",
   insufficientAllowance: () => "Insufficient allowance",
-  zeroAmount: () => "Cannot deposit zero amount",
   poolExists: () => "Pool already exists",
   poolDoesNotExist: () => "Pool does not exist",
   tokensMatch: () => "Cannot create pool with matching tokens",
@@ -298,10 +297,9 @@ export class XYK extends RuntimeModule<unknown> {
     minAmountOut: Balance,
     wrappedPath: WrappedPath,
   ) {
-    // Unwrap path
-    const path: TokenId[] = wrappedPath.path;
-
     assert(minAmountOut.greaterThan(Balance.from(0)));
+
+    const path = this.validateAndUnwrapPath(wrappedPath);
 
     let amountOut = Balance.from(0);
     let pool = PoolKey.empty();
@@ -322,7 +320,6 @@ export class XYK extends RuntimeModule<unknown> {
       sender = pool;
       amountIn = amountOut;
     }
-    assert(pool.isEmpty().not());
     assert(
       amountOut.greaterThanOrEqual(minAmountOut),
       errors.amountOutTooLow(),
@@ -336,10 +333,9 @@ export class XYK extends RuntimeModule<unknown> {
     amountOut: Balance,
     wrappedPath: WrappedPath,
   ) {
-    // Unwrap path
-    const path: TokenId[] = wrappedPath.path;
-
     assert(maxAmountIn.greaterThan(Balance.from(0)));
+
+    const path = this.validateAndUnwrapPath(wrappedPath);
 
     let amountIn = Balance.from(0);
     let pool = PoolKey.empty();
@@ -360,9 +356,19 @@ export class XYK extends RuntimeModule<unknown> {
       receiver = pool;
       amountOut = amountIn;
     }
-    assert(pool.isEmpty().not());
     assert(amountIn.lessThanOrEqual(maxAmountIn), errors.amountInTooHigh());
     this.balances._transfer(tokenIn, this.transaction.sender, pool, amountIn);
+  }
+
+  public validateAndUnwrapPath(wrappedPath: WrappedPath) {
+    // Unwrap path
+    const path: TokenId[] = wrappedPath.path;
+    // Path must have 2 or more tokens
+    assert(
+      UInt64.from(path.length).greaterThan(UInt64.from(1)),
+      errors.invalidPath(),
+    );
+    return path;
   }
 
   public safeSub(minuend: UInt64, subtrahend: UInt64): UInt64 {
