@@ -55,8 +55,8 @@ export class LPTokenId extends TokenId {
   }
 }
 
-export class Path extends Struct({
-  tokens: Provable.Array(TokenId, 10),
+export class WrappedPath extends Struct({
+  path: Provable.Array(TokenId, 10),
 }) {}
 
 export const errors = {
@@ -296,9 +296,10 @@ export class XYK extends RuntimeModule<unknown> {
   public swapExactTokensForTokens(
     amountIn: Balance,
     minAmountOut: Balance,
-    path: Path,
+    wrappedPath: WrappedPath,
   ) {
-    const tokens = path.tokens;
+    // Unwrap path
+    const path: TokenId[] = wrappedPath.path;
 
     assert(minAmountOut.greaterThanOrEqual(Balance.from(0)));
 
@@ -307,9 +308,9 @@ export class XYK extends RuntimeModule<unknown> {
     let sender = this.transaction.sender;
     let tokenOut = TokenId.from(0);
 
-    for (let i = 0; i < tokens.length - 1; i++) {
-      const tokenIn = tokens[i];
-      tokenOut = tokens[i + 1];
+    for (let i = 0; i < path.length - 1; i++) {
+      const tokenIn = path[i];
+      tokenOut = path[i + 1];
 
       this.assertPoolExists(tokenIn, tokenOut);
 
@@ -333,9 +334,10 @@ export class XYK extends RuntimeModule<unknown> {
   public swapTokensForExactTokens(
     maxAmountIn: Balance,
     amountOut: Balance,
-    path: Path,
+    wrappedPath: WrappedPath,
   ) {
-    const tokens = path.tokens;
+    // Unwrap path
+    const path: TokenId[] = wrappedPath.path;
 
     assert(maxAmountIn.greaterThan(Balance.from(0)));
 
@@ -344,9 +346,9 @@ export class XYK extends RuntimeModule<unknown> {
     let receiver = this.transaction.sender;
     let tokenIn = TokenId.from(0);
 
-    for (let i = tokens.length - 1; i > 0; i--) {
-      tokenIn = tokens[i - 1];
-      const tokenOut = tokens[i];
+    for (let i = path.length - 1; i > 0; i--) {
+      tokenIn = path[i - 1];
+      const tokenOut = path[i];
 
       this.assertPoolExists(tokenIn, tokenOut);
 
