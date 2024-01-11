@@ -301,7 +301,7 @@ export class XYK extends RuntimeModule<unknown> {
     // Unwrap path
     const path: TokenId[] = wrappedPath.path;
 
-    assert(minAmountOut.greaterThanOrEqual(Balance.from(0)));
+    assert(minAmountOut.greaterThan(Balance.from(0)));
 
     let amountOut = Balance.from(0);
     let pool = PoolKey.empty();
