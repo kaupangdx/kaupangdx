@@ -287,8 +287,10 @@ describe("xyk", () => {
       let aliceBalanceA = balanceToMint - initialLiquidityA;
       let aliceBalanceB = balanceToMint - initialLiquidityB;
 
-      const wrappedPath = new WrappedPath({path: [tokenA, tokenB],});
-      const dummies: TokenId[] = Array(10 - wrappedPath.path.length).fill(TokenId.from(0));
+      const wrappedPath = new WrappedPath({ path: [tokenA, tokenB] });
+      const dummies: TokenId[] = Array(10 - wrappedPath.path.length).fill(
+        TokenId.from(0),
+      );
       wrappedPath.path = wrappedPath.path.concat(dummies);
 
       it("should swap exact A for B", async () => {

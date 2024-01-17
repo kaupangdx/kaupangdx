@@ -74,6 +74,10 @@ export const errors = {
   tokensMatch: () => "Cannot create pool with matching tokens",
   amountOutTooLow: () => "Token out amount too low",
   amountInTooHigh: () => "Token in amount too high",
+  invalidMaxAmountIn: () => "Invalid max amount in value",
+  invalidMinAmountOut: () => "Invalid min amount out value",
+  invalidAmountIn: () => "Invalid amount in value",
+  invalidAmountOut: () => "Invalid amount out value",
 };
 
 @runtimeModule()
@@ -178,10 +182,7 @@ export class XYK extends RuntimeModule<unknown> {
 
     const liquidity = Provable.if(liqB.greaterThan(liqA), Balance, liqA, liqB);
 
-    assert(
-      liquidity.greaterThan(Balance.zero),
-      errors.insufficientBalances(),
-    );
+    assert(liquidity.greaterThan(Balance.zero), errors.insufficientBalances());
 
     this.balances.mint(lpToken, this.transaction.sender, liquidity);
   }
@@ -289,10 +290,10 @@ export class XYK extends RuntimeModule<unknown> {
     const denominator = this.safeSub(reserveOut, amountOut);
 
     return Provable.if(
-        denominator.equals(Balance.zero),
-        Balance,
-        Balance.zero,
-        numerator.div(denominator)
+      denominator.equals(Balance.zero),
+      Balance,
+      Balance.zero,
+      numerator.div(denominator),
     );
 
     //this.safeDiv(numerator, denominator);
@@ -304,8 +305,11 @@ export class XYK extends RuntimeModule<unknown> {
     minAmountOut: Balance,
     wrappedPath: WrappedPath,
   ) {
-    assert(amountIn.greaterThan(Balance.zero));
-    assert(minAmountOut.greaterThan(Balance.zero));
+    assert(amountIn.greaterThan(Balance.zero), errors.invalidAmountIn());
+    assert(
+      minAmountOut.greaterThan(Balance.zero),
+      errors.invalidMinAmountOut(),
+    );
 
     const path = this.validateAndUnwrapPath(wrappedPath);
 
@@ -326,19 +330,9 @@ export class XYK extends RuntimeModule<unknown> {
       const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
       const poolExists = this.pools.get(pool).isSome;
 
-      lastTokenOut = Provable.if(
-          poolExists,
-          TokenId,
-          tokenOut,
-          lastTokenOut
-      );
+      lastTokenOut = Provable.if(poolExists, TokenId, tokenOut, lastTokenOut);
 
-      lastPool = Provable.if(
-        poolExists,
-        PublicKey,
-        pool,
-        lastPool
-      );
+      lastPool = Provable.if(poolExists, PublicKey, pool, lastPool);
 
       // amountOut = this.calculateTokenOutAmount(tokenIn, tokenOut, amountIn);
       amountOut = Provable.if(
@@ -370,12 +364,17 @@ export class XYK extends RuntimeModule<unknown> {
       amountOut.greaterThanOrEqual(minAmountOut),
       errors.amountOutTooLow(),
     );
-   // console.log(lastPool.x.toString())
-   // console.log(PoolKey.fromTokenPair(path[0], path[1]).x.toString());
-   // console.log(amountOut.toString());
-   // console.log(this.balances.getBalance(path[0], lastPool).toString());
-   // console.log(this.balances.getBalance(path[1], lastPool).toString());
-    this.balances._transfer(lastTokenOut, lastPool, this.transaction.sender, amountOut);
+    // console.log(lastPool.x.toString())
+    // console.log(PoolKey.fromTokenPair(path[0], path[1]).x.toString());
+    // console.log(amountOut.toString());
+    // console.log(this.balances.getBalance(path[0], lastPool).toString());
+    // console.log(this.balances.getBalance(path[1], lastPool).toString());
+    this.balances._transfer(
+      lastTokenOut,
+      lastPool,
+      this.transaction.sender,
+      amountOut,
+    );
   }
 
   @runtimeMethod()
@@ -384,7 +383,8 @@ export class XYK extends RuntimeModule<unknown> {
     amountOut: Balance,
     wrappedPath: WrappedPath,
   ) {
-    assert(maxAmountIn.greaterThan(Balance.zero));
+    assert(maxAmountIn.greaterThan(Balance.zero), errors.invalidMaxAmountIn());
+    assert(amountOut.greaterThan(Balance.zero), errors.invalidAmountOut());
 
     const path = this.validateAndUnwrapPath(wrappedPath);
 
