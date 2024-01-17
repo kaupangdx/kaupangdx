@@ -264,7 +264,7 @@ export class XYK extends RuntimeModule<unknown> {
     const numerator = amountIn.mul(reserveOut);
     const denominator = reserveIn.add(amountIn);
 
-    return numerator.div(denominator);
+    return this.safeDiv(numerator, denominator);
   }
 
   public calculateAmountIn(
@@ -288,7 +288,14 @@ export class XYK extends RuntimeModule<unknown> {
     const numerator = reserveIn.mul(amountOut);
     const denominator = this.safeSub(reserveOut, amountOut);
 
-    return this.safeDiv(numerator, denominator);
+    return Provable.if(
+        denominator.equals(Balance.zero),
+        Balance,
+        Balance.zero,
+        numerator.div(denominator)
+    );
+
+    //this.safeDiv(numerator, denominator);
   }
 
   @runtimeMethod()
@@ -297,37 +304,78 @@ export class XYK extends RuntimeModule<unknown> {
     minAmountOut: Balance,
     wrappedPath: WrappedPath,
   ) {
+    assert(amountIn.greaterThan(Balance.from(0)));
     assert(minAmountOut.greaterThan(Balance.from(0)));
 
     const path = this.validateAndUnwrapPath(wrappedPath);
 
     let amountOut = Balance.from(0);
-    let pool = PoolKey.empty();
+    let lastPool = PoolKey.empty();
     let sender = this.transaction.sender;
-    let tokenOut = TokenId.from(0);
+    let lastTokenOut = TokenId.from(0);
 
     // Flow which iteratively swaps tokens across multiple pools until the
-    // end of the path has been reached [0..path.length-1] and the amountOut
-    // is known and greater than minAmountIn
-    for (let i = 0; i < path.length - 1; i++) {
+    // end of the path has been reached and the amountOut is known and
+    // greater than minAmountIn
+    for (let i = 0; i < 8; i++) {
+      // tokens
       const tokenIn = path[i];
-      tokenOut = path[i + 1];
+      const tokenOut = path[i + 1];
 
-      this.assertPoolExists(tokenIn, tokenOut);
+      // this.assertPoolExists(tokenIn, tokenOut);
+      const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
+      const poolExists = this.pools.get(pool).isSome;
 
-      pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
-      amountOut = this.calculateTokenOutAmount(tokenIn, tokenOut, amountIn);
+      lastTokenOut = Provable.if(
+          poolExists,
+          TokenId,
+          tokenOut,
+          lastTokenOut
+      );
 
-      this.balances._transfer(tokenIn, sender, pool, amountIn);
+      lastPool = Provable.if(
+        poolExists,
+        PublicKey,
+        pool,
+        lastPool
+      );
 
-      sender = pool;
+      // amountOut = this.calculateTokenOutAmount(tokenIn, tokenOut, amountIn);
+      amountOut = Provable.if(
+        poolExists,
+        Balance,
+        this.calculateTokenOutAmount(tokenIn, tokenOut, amountIn),
+        amountOut,
+      );
+
+      amountIn = Provable.if(poolExists, Balance, amountIn, Balance.zero);
+      // Sending zero to the lastPool if pool for current pair does not exist
+      //  console.log("Iteration",i);
+      //  console.log(tokenIn.toString());
+      //  console.log(sender.x.toString());
+      //  console.log(lastPool.x.toString());
+      //  console.log(amountIn.toString());
+      this.balances._transfer(tokenIn, sender, lastPool, amountIn);
+      // sender = pool;
+      sender = lastPool;
       amountIn = amountOut;
+      // amountIn = Provable.if(
+      //   poolExists,
+      //   Balance,
+      //   amountOut,
+      //   Balance.zero,
+      // );
     }
     assert(
       amountOut.greaterThanOrEqual(minAmountOut),
       errors.amountOutTooLow(),
     );
-    this.balances._transfer(tokenOut, pool, this.transaction.sender, amountOut);
+   // console.log(lastPool.x.toString())
+   // console.log(PoolKey.fromTokenPair(path[0], path[1]).x.toString());
+   // console.log(amountOut.toString());
+   // console.log(this.balances.getBalance(path[0], lastPool).toString());
+   // console.log(this.balances.getBalance(path[1], lastPool).toString());
+    this.balances._transfer(lastTokenOut, lastPool, this.transaction.sender, amountOut);
   }
 
   @runtimeMethod()
@@ -348,7 +396,7 @@ export class XYK extends RuntimeModule<unknown> {
     // Flow which iteratively swaps tokens in reverse across multiple pools
     // until the beggining of the path has been reached [path.length-1..0]
     // and amountIn is known and lower than maxAmountIn
-    for (let i = path.length - 1; i > 0; i--) {
+    for (let i = 9; i > 1; i--) {
       tokenIn = path[i - 1];
       const tokenOut = path[i];
 
@@ -369,11 +417,14 @@ export class XYK extends RuntimeModule<unknown> {
   public validateAndUnwrapPath(wrappedPath: WrappedPath) {
     // Unwrap path
     const path: TokenId[] = wrappedPath.path;
-    // Path must have 2 or more tokens
+    // Path must have the length of 10
     assert(
-      UInt64.from(path.length).greaterThan(UInt64.from(1)),
+      UInt64.from(path.length).equals(UInt64.from(10)),
       errors.invalidPath(),
     );
+    // Assert that path begins with a valid pool
+    this.assertPoolExists(path[0], path[1]);
+
     return path;
   }
 

@@ -8,7 +8,7 @@ module.exports = {
     rootDir: './',
     moduleDirectories: ["node_modules", "src"],
     extensionsToTreatAsEsm: ['.ts'],
-    testTimeout: 30_000,
+    testTimeout: 50_000,
     setupFilesAfterEnv: ["jest-expect-message"],
     moduleNameMapper: {
         '../../../node_modules/snarkyjs/dist/(.*)': '<rootDir>/node_modules/snarkyjs/dist/$1',

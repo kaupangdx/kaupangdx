@@ -19,8 +19,9 @@ describe("xyk", () => {
   );
   const alice = aliceKey.toPublicKey();
 
-  const tokenA = TokenId.from(0);
-  const tokenB = TokenId.from(1);
+  // Restrict use of zero for tokenId
+  const tokenA = TokenId.from(5);
+  const tokenB = TokenId.from(7);
 
   let appChain: TestingAppChain<RuntimeModules>;
 
@@ -286,6 +287,10 @@ describe("xyk", () => {
       let aliceBalanceA = balanceToMint - initialLiquidityA;
       let aliceBalanceB = balanceToMint - initialLiquidityB;
 
+      const wrappedPath = new WrappedPath({path: [tokenA, tokenB],});
+      const dummies: TokenId[] = Array(10 - wrappedPath.path.length).fill(TokenId.from(0));
+      wrappedPath.path = wrappedPath.path.concat(dummies);
+
       it("should swap exact A for B", async () => {
         const amountIn = 100n;
         const amountOut = (amountIn * reserveB) / (amountIn + reserveA); //minAmountOut but is exact amount out
@@ -295,9 +300,7 @@ describe("xyk", () => {
             xyk.swapExactTokensForTokens(
               Balance.from(amountIn),
               Balance.from(amountOut),
-              new WrappedPath({
-                path: [tokenA, tokenB],
-              }),
+              wrappedPath,
             );
           },
           { nonce },
@@ -307,6 +310,7 @@ describe("xyk", () => {
         await tx.send();
         const block = await appChain.produceBlock();
 
+        console.log(block?.txs[0].statusMessage);
         expect(block?.txs[0].status).toBe(true);
 
         aliceBalanceA -= amountIn;
