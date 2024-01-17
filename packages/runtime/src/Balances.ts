@@ -53,7 +53,7 @@ export class Balances extends RuntimeModule<unknown> {
       balanceOption.isSome,
       Balance,
       balanceOption.value,
-      Balance.from(0),
+      Balance.zero,
     );
   }
 

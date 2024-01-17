@@ -179,7 +179,7 @@ export class XYK extends RuntimeModule<unknown> {
     const liquidity = Provable.if(liqB.greaterThan(liqA), Balance, liqA, liqB);
 
     assert(
-      liquidity.greaterThan(Balance.from(0)),
+      liquidity.greaterThan(Balance.zero),
       errors.insufficientBalances(),
     );
 
@@ -304,12 +304,12 @@ export class XYK extends RuntimeModule<unknown> {
     minAmountOut: Balance,
     wrappedPath: WrappedPath,
   ) {
-    assert(amountIn.greaterThan(Balance.from(0)));
-    assert(minAmountOut.greaterThan(Balance.from(0)));
+    assert(amountIn.greaterThan(Balance.zero));
+    assert(minAmountOut.greaterThan(Balance.zero));
 
     const path = this.validateAndUnwrapPath(wrappedPath);
 
-    let amountOut = Balance.from(0);
+    let amountOut = Balance.zero;
     let lastPool = PoolKey.empty();
     let sender = this.transaction.sender;
     let lastTokenOut = TokenId.from(0);
@@ -384,11 +384,11 @@ export class XYK extends RuntimeModule<unknown> {
     amountOut: Balance,
     wrappedPath: WrappedPath,
   ) {
-    assert(maxAmountIn.greaterThan(Balance.from(0)));
+    assert(maxAmountIn.greaterThan(Balance.zero));
 
     const path = this.validateAndUnwrapPath(wrappedPath);
 
-    let amountIn = Balance.from(0);
+    let amountIn = Balance.zero;
     let pool = PoolKey.empty();
     let receiver = this.transaction.sender;
     let tokenIn = TokenId.from(0);
