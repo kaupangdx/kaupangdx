@@ -312,7 +312,6 @@ describe("xyk", () => {
         await tx.send();
         const block = await appChain.produceBlock();
 
-        console.log(block?.txs[0].statusMessage);
         expect(block?.txs[0].status).toBe(true);
 
         aliceBalanceA -= amountIn;
@@ -339,9 +338,7 @@ describe("xyk", () => {
             xyk.swapTokensForExactTokens(
               Balance.from(amountInMax),
               Balance.from(amountOut),
-              new WrappedPath({
-                path: [tokenA, tokenB],
-              }),
+              wrappedPath,
             );
           },
           { nonce },
@@ -351,6 +348,7 @@ describe("xyk", () => {
         await tx.send();
         const block = await appChain.produceBlock();
 
+        console.log(block?.txs[0].statusMessage);
         expect(block?.txs[0].status).toBe(true);
 
         aliceBalanceA -= amountIn;

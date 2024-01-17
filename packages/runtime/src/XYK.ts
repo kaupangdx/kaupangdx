@@ -287,13 +287,14 @@ export class XYK extends RuntimeModule<unknown> {
     amountOut: Balance,
   ) {
     const numerator = reserveIn.mul(amountOut);
+    console.log(reserveOut.toString(), amountOut.toString());
     const denominator = this.safeSub(reserveOut, amountOut);
-
+    console.log(denominator.toString());
     return Provable.if(
       denominator.equals(Balance.zero),
       Balance,
       Balance.zero,
-      numerator.div(denominator),
+      this.safeDiv(numerator, denominator),
     );
 
     //this.safeDiv(numerator, denominator);
@@ -326,7 +327,6 @@ export class XYK extends RuntimeModule<unknown> {
       const tokenIn = path[i];
       const tokenOut = path[i + 1];
 
-      // this.assertPoolExists(tokenIn, tokenOut);
       const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
       const poolExists = this.pools.get(pool).isSome;
 
@@ -334,7 +334,6 @@ export class XYK extends RuntimeModule<unknown> {
 
       lastPool = Provable.if(poolExists, PublicKey, pool, lastPool);
 
-      // amountOut = this.calculateTokenOutAmount(tokenIn, tokenOut, amountIn);
       amountOut = Provable.if(
         poolExists,
         Balance,
@@ -344,31 +343,14 @@ export class XYK extends RuntimeModule<unknown> {
 
       amountIn = Provable.if(poolExists, Balance, amountIn, Balance.zero);
       // Sending zero to the lastPool if pool for current pair does not exist
-      //  console.log("Iteration",i);
-      //  console.log(tokenIn.toString());
-      //  console.log(sender.x.toString());
-      //  console.log(lastPool.x.toString());
-      //  console.log(amountIn.toString());
       this.balances._transfer(tokenIn, sender, lastPool, amountIn);
-      // sender = pool;
       sender = lastPool;
       amountIn = amountOut;
-      // amountIn = Provable.if(
-      //   poolExists,
-      //   Balance,
-      //   amountOut,
-      //   Balance.zero,
-      // );
     }
     assert(
       amountOut.greaterThanOrEqual(minAmountOut),
       errors.amountOutTooLow(),
     );
-    // console.log(lastPool.x.toString())
-    // console.log(PoolKey.fromTokenPair(path[0], path[1]).x.toString());
-    // console.log(amountOut.toString());
-    // console.log(this.balances.getBalance(path[0], lastPool).toString());
-    // console.log(this.balances.getBalance(path[1], lastPool).toString());
     this.balances._transfer(
       lastTokenOut,
       lastPool,
@@ -389,29 +371,41 @@ export class XYK extends RuntimeModule<unknown> {
     const path = this.validateAndUnwrapPath(wrappedPath);
 
     let amountIn = Balance.zero;
-    let pool = PoolKey.empty();
+    let lastPool = PoolKey.empty();
     let receiver = this.transaction.sender;
-    let tokenIn = TokenId.from(0);
+    let lastTokenIn = path[0];
 
     // Flow which iteratively swaps tokens in reverse across multiple pools
-    // until the beggining of the path has been reached [path.length-1..0]
-    // and amountIn is known and lower than maxAmountIn
-    for (let i = 9; i > 1; i--) {
-      tokenIn = path[i - 1];
+    // until the beggining of the path has been reached and amountIn is known
+    // and lower than maxAmountIn
+    for (let i = 9; i > 0; i--) {
+      const tokenIn = path[i - 1];
       const tokenOut = path[i];
 
-      this.assertPoolExists(tokenIn, tokenOut);
+      const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
+      const poolExists = this.pools.get(pool).isSome;
 
-      pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
-      amountIn = this.calculateAmountIn(tokenIn, tokenOut, amountOut);
+      lastPool = Provable.if(poolExists, PublicKey, pool, lastPool);
 
-      this.balances._transfer(tokenOut, pool, receiver, amountOut);
+      const currentAmountOut = Provable.if(poolExists, Balance, amountOut, Balance.zero);
+      this.balances._transfer(tokenOut, lastPool, receiver, currentAmountOut);
 
-      receiver = pool;
-      amountOut = amountIn;
+      receiver = Provable.if(poolExists, PublicKey, pool, receiver);
+
+      amountIn = Provable.if(
+        poolExists,
+        Balance,
+        this.calculateAmountIn(tokenIn, tokenOut, currentAmountOut),
+        amountIn,
+      );
+
+      amountOut = Provable.if(poolExists, Balance, amountIn, amountOut);
     }
+    console.log(lastTokenIn.toString());
+    console.log(amountIn.toString());
+    console.log(this.balances.getBalance(lastTokenIn, this.transaction.sender).toString());
     assert(amountIn.lessThanOrEqual(maxAmountIn), errors.amountInTooHigh());
-    this.balances._transfer(tokenIn, this.transaction.sender, pool, amountIn);
+    this.balances._transfer(lastTokenIn, this.transaction.sender, lastPool, amountIn);
   }
 
   public validateAndUnwrapPath(wrappedPath: WrappedPath) {
