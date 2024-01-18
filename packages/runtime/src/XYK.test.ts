@@ -120,7 +120,7 @@ describe("xyk", () => {
       expect((await getBalance(tokenA, pool))?.toBigInt()).toBe(reserveA);
       expect((await getBalance(tokenB, pool))?.toBigInt()).toBe(reserveB);
       // Log reserves
-      console.log("Reserves:", reserveA, reserveB);
+      // console.log("Reserves:", reserveA, reserveB);
     });
 
     it("should create a pool", async () => {
@@ -350,7 +350,6 @@ describe("xyk", () => {
         await tx.send();
         const block = await appChain.produceBlock();
 
-        console.log(block?.txs[0].statusMessage);
         expect(block?.txs[0].status).toBe(true);
 
         aliceBalanceA -= amountIn;
@@ -359,11 +358,7 @@ describe("xyk", () => {
         const balanceA = await getBalance(tokenA, alice);
         const balanceB = await getBalance(tokenB, alice);
 
-        console.log(aliceBalanceA, balanceA?.toString());
-        console.log(aliceBalanceB, balanceB?.toString());
-
         expect(balanceA?.toBigInt()).toBe(aliceBalanceA);
-
         expect(balanceB?.toBigInt()).toBe(aliceBalanceB);
 
         reserveA += amountIn;

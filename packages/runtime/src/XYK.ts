@@ -287,9 +287,7 @@ export class XYK extends RuntimeModule<unknown> {
     amountOut: Balance,
   ) {
     const numerator = reserveIn.mul(amountOut);
-    //console.log(reserveOut.toString(), amountOut.toString());
     const denominator = this.safeSub(reserveOut, amountOut);
-    //console.log(denominator.toString());
     return Provable.if(
       denominator.equals(Balance.zero),
       Balance,
@@ -321,7 +319,6 @@ export class XYK extends RuntimeModule<unknown> {
     // end of the path has been reached and the amountOut is known and
     // greater than minAmountIn
     for (let i = 0; i < 9; i++) {
-      // tokens
       const tokenIn = path[i];
       const tokenOut = path[i + 1];
 
