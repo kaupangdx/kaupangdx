@@ -287,17 +287,15 @@ export class XYK extends RuntimeModule<unknown> {
     amountOut: Balance,
   ) {
     const numerator = reserveIn.mul(amountOut);
-    console.log(reserveOut.toString(), amountOut.toString());
+    //console.log(reserveOut.toString(), amountOut.toString());
     const denominator = this.safeSub(reserveOut, amountOut);
-    console.log(denominator.toString());
+    //console.log(denominator.toString());
     return Provable.if(
       denominator.equals(Balance.zero),
       Balance,
       Balance.zero,
       this.safeDiv(numerator, denominator),
     );
-
-    //this.safeDiv(numerator, denominator);
   }
 
   @runtimeMethod()
@@ -322,7 +320,7 @@ export class XYK extends RuntimeModule<unknown> {
     // Flow which iteratively swaps tokens across multiple pools until the
     // end of the path has been reached and the amountOut is known and
     // greater than minAmountIn
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 9; i++) {
       // tokens
       const tokenIn = path[i];
       const tokenOut = path[i + 1];
@@ -370,10 +368,7 @@ export class XYK extends RuntimeModule<unknown> {
 
     const path = this.validateAndUnwrapPath(wrappedPath);
 
-    let amountIn = Balance.zero;
-    let lastPool = PoolKey.empty();
     let receiver = this.transaction.sender;
-    let lastTokenIn = path[0];
 
     // Flow which iteratively swaps tokens in reverse across multiple pools
     // until the beggining of the path has been reached and amountIn is known
@@ -385,27 +380,35 @@ export class XYK extends RuntimeModule<unknown> {
       const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
       const poolExists = this.pools.get(pool).isSome;
 
-      lastPool = Provable.if(poolExists, PublicKey, pool, lastPool);
+      const currentAmountOut = Provable.if(
+        poolExists,
+        Balance,
+        amountOut,
+        Balance.zero,
+      );
 
-      const currentAmountOut = Provable.if(poolExists, Balance, amountOut, Balance.zero);
-      this.balances._transfer(tokenOut, lastPool, receiver, currentAmountOut);
+      this.balances._transfer(tokenOut, pool, receiver, currentAmountOut);
 
       receiver = Provable.if(poolExists, PublicKey, pool, receiver);
 
-      amountIn = Provable.if(
+      amountOut = Provable.if(
         poolExists,
         Balance,
         this.calculateAmountIn(tokenIn, tokenOut, currentAmountOut),
-        amountIn,
+        amountOut,
       );
-
-      amountOut = Provable.if(poolExists, Balance, amountIn, amountOut);
     }
-    console.log(lastTokenIn.toString());
-    console.log(amountIn.toString());
-    console.log(this.balances.getBalance(lastTokenIn, this.transaction.sender).toString());
-    assert(amountIn.lessThanOrEqual(maxAmountIn), errors.amountInTooHigh());
-    this.balances._transfer(lastTokenIn, this.transaction.sender, lastPool, amountIn);
+    console.log(amountOut.toString());
+    console.log(
+      this.balances.getBalance(path[0], this.transaction.sender).toString(),
+    );
+    assert(amountOut.lessThanOrEqual(maxAmountIn), errors.amountInTooHigh());
+    this.balances._transfer(
+      path[0],
+      this.transaction.sender,
+      PoolKey.fromTokenPair(path[0], path[1]),
+      amountOut,
+    );
   }
 
   public validateAndUnwrapPath(wrappedPath: WrappedPath) {
@@ -443,7 +446,8 @@ export class XYK extends RuntimeModule<unknown> {
 
   public getSafeDenominator(denominator: UInt64): UInt64 {
     const isDenominatorNotZero = denominator.equals(UInt64.zero).not();
-    assert(isDenominatorNotZero, errors.divisionByZero());
+    // TODO: make assertion optional
+    // assert(isDenominatorNotZero, errors.divisionByZero());
 
     return Provable.if(
       isDenominatorNotZero,

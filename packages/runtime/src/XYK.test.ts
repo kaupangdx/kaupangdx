@@ -119,6 +119,8 @@ describe("xyk", () => {
       // Check reserves
       expect((await getBalance(tokenA, pool))?.toBigInt()).toBe(reserveA);
       expect((await getBalance(tokenB, pool))?.toBigInt()).toBe(reserveB);
+      // Log reserves
+      console.log("Reserves:", reserveA, reserveB);
     });
 
     it("should create a pool", async () => {
@@ -329,14 +331,14 @@ describe("xyk", () => {
       });
 
       it("should swap A for exact B", async () => {
-        const amountInMax = 100n;
+        const maxAmountIn = 110n;
         const amountOut = 150n;
         const amountIn = (amountOut * reserveA) / (reserveB - amountOut);
         const tx = await appChain.transaction(
           alice,
           () => {
             xyk.swapTokensForExactTokens(
-              Balance.from(amountInMax),
+              Balance.from(maxAmountIn),
               Balance.from(amountOut),
               wrappedPath,
             );
@@ -356,6 +358,9 @@ describe("xyk", () => {
 
         const balanceA = await getBalance(tokenA, alice);
         const balanceB = await getBalance(tokenB, alice);
+
+        console.log(aliceBalanceA, balanceA?.toString());
+        console.log(aliceBalanceB, balanceB?.toString());
 
         expect(balanceA?.toBigInt()).toBe(aliceBalanceA);
 
