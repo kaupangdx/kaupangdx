@@ -331,7 +331,7 @@ describe("xyk", () => {
       });
 
       it("should swap A for exact B", async () => {
-        const maxAmountIn = 110n;
+        const maxAmountIn = 100n;
         const amountOut = 150n;
         const amountIn = (amountOut * reserveA) / (reserveB - amountOut);
         const tx = await appChain.transaction(

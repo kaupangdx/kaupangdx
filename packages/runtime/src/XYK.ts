@@ -387,21 +387,16 @@ export class XYK extends RuntimeModule<unknown> {
         Balance.zero,
       );
 
-      this.balances._transfer(tokenOut, pool, receiver, currentAmountOut);
-
-      receiver = Provable.if(poolExists, PublicKey, pool, receiver);
-
       amountOut = Provable.if(
         poolExists,
         Balance,
         this.calculateAmountIn(tokenIn, tokenOut, currentAmountOut),
         amountOut,
       );
+
+      this.balances._transfer(tokenOut, pool, receiver, currentAmountOut);
+      receiver = Provable.if(poolExists, PublicKey, pool, receiver);
     }
-    console.log(amountOut.toString());
-    console.log(
-      this.balances.getBalance(path[0], this.transaction.sender).toString(),
-    );
     assert(amountOut.lessThanOrEqual(maxAmountIn), errors.amountInTooHigh());
     this.balances._transfer(
       path[0],
