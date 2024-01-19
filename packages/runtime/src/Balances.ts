@@ -4,14 +4,14 @@ import {
   state,
   runtimeModule,
 } from "@proto-kit/module";
-import { StateMap, assert } from "@proto-kit/protocol";
-import { Field, Provable, PublicKey, Struct, UInt64 } from "o1js";
+import { StateMap } from "@proto-kit/protocol";
+import { Field, Provable, PublicKey, Struct, UInt64, Bool } from "o1js";
 import { inject } from "tsyringe";
 import { Admin } from "./Admin";
+import { SafeMath } from "./SafeMath";
 
 export const errors = {
-  unauthorizedSender: () => "Unauthorized sender",
-  insufficientBalance: () => "Insufficient balance",
+  unauthorizedSender: () => "Unauthorized sender"
 };
 
 export class TokenId extends Field {}
@@ -70,27 +70,10 @@ export class Balances extends RuntimeModule<unknown> {
   ) {
     const fromBalance = this.getBalance(tokenId, from);
     const toBalance = this.getBalance(tokenId, to);
-    const fromBalanceIsSufficient = fromBalance.greaterThanOrEqual(amount);
-
-    // Assert balance sufficiency
-    assert(fromBalanceIsSufficient, errors.insufficientBalance());
-
-    // Field substraction underflow prevention
-    const paddedFrombalance = fromBalance.add(amount);
-    const safeFromBalance = Provable.if(
-      fromBalanceIsSufficient,
-      Balance,
-      fromBalance,
-      paddedFrombalance,
-    );
-
-    // Compute new balance values
-    const newFromBalance = safeFromBalance.sub(amount);
-    const newToBalance = toBalance.add(amount);
 
     // Set balances
-    this.setBalance(tokenId, from, newFromBalance);
-    this.setBalance(tokenId, to, newToBalance);
+    this.setBalance(tokenId, from, SafeMath.safeSub(fromBalance, amount, Bool(true)));
+    this.setBalance(tokenId, to, toBalance.add(amount));
   }
 
   public mint(tokenId: TokenId, address: PublicKey, amount: Balance) {
@@ -116,32 +99,10 @@ export class Balances extends RuntimeModule<unknown> {
     const sender = this.transaction.sender;
 
     const balance = this.getBalance(tokenId, sender);
-    const balanceIsSufficient = balance.greaterThanOrEqual(amount);
-
     const supply = this.getSupply(tokenId);
-    const supplyIsSufficient = supply.greaterThanOrEqual(amount);
 
-    // Assert balance sufficiency
-    assert(balanceIsSufficient, errors.insufficientBalance());
-
-    // Field substraction underflow prevention
-    const paddedBalance = Provable.if(
-      balanceIsSufficient,
-      Balance,
-      balance,
-      balance.add(amount),
-    );
-
-    // Field substraction underflow prevention
-    const paddedSupply = Provable.if(
-      supplyIsSufficient,
-      Balance,
-      supply,
-      supply.add(amount),
-    );
-
-    this.setBalance(tokenId, sender, paddedBalance.sub(amount));
-    this.supply.set(tokenId, paddedSupply.sub(amount));
+    this.setBalance(tokenId, sender, SafeMath.safeSub(balance, amount, Bool(true)));
+    this.supply.set(tokenId, SafeMath.safeSub(supply, amount, Bool(true)));
   }
 
   @runtimeMethod()
