@@ -12,6 +12,7 @@ import {
   Poseidon,
   Provable,
   PublicKey,
+  Bool,
   Struct,
   UInt64,
 } from "o1js";
@@ -149,7 +150,7 @@ export class XYK extends RuntimeModule<unknown> {
     const reserveA = this.balances.getBalance(tokenA, pool);
     const reserveB = this.balances.getBalance(tokenB, pool);
 
-    const amountB = this.safeDiv(amountA.mul(reserveB), reserveA);
+    const amountB = this.safeDiv(amountA.mul(reserveB), reserveA, Bool(true));
     assert(
       amountBMax.greaterThanOrEqual(amountB),
       errors.insufficientAllowance(),
@@ -163,12 +164,12 @@ export class XYK extends RuntimeModule<unknown> {
     this.balances.setBalance(
       tokenA,
       sender,
-      this.safeSub(senderBalanceA, amountA),
+      this.safeSub(senderBalanceA, amountA, Bool(true)),
     );
     this.balances.setBalance(
       tokenB,
       sender,
-      this.safeSub(senderBalanceB, amountB),
+      this.safeSub(senderBalanceB, amountB, Bool(true)),
     );
 
     this.balances.setBalance(tokenA, pool, reserveA.add(amountA));
@@ -177,8 +178,8 @@ export class XYK extends RuntimeModule<unknown> {
     const lpToken = LPTokenId.fromTokenPair(tokenA, tokenB);
     const totalSupply = this.balances.getSupply(lpToken);
 
-    const liqA = this.safeDiv(amountA.mul(totalSupply), reserveA);
-    const liqB = this.safeDiv(amountB.mul(totalSupply), reserveB);
+    const liqA = this.safeDiv(amountA.mul(totalSupply), reserveA, Bool(true));
+    const liqB = this.safeDiv(amountB.mul(totalSupply), reserveB, Bool(true));
 
     const liquidity = Provable.if(liqB.greaterThan(liqA), Balance, liqA, liqB);
 
@@ -207,6 +208,7 @@ export class XYK extends RuntimeModule<unknown> {
 
     const totalSupply = this.getSafeDenominator(
       this.balances.getSupply(lpToken),
+      Bool(true),
     );
 
     const amountA = liquidity.mul(reserveA).div(totalSupply);
@@ -233,8 +235,16 @@ export class XYK extends RuntimeModule<unknown> {
       this.balances.getBalance(tokenB, sender).add(amountB),
     );
 
-    this.balances.setBalance(tokenA, pool, this.safeSub(reserveA, amountA));
-    this.balances.setBalance(tokenB, pool, this.safeSub(reserveB, amountB));
+    this.balances.setBalance(
+      tokenA,
+      pool,
+      this.safeSub(reserveA, amountA, Bool(true)),
+    );
+    this.balances.setBalance(
+      tokenB,
+      pool,
+      this.safeSub(reserveB, amountB, Bool(true)),
+    );
     // Burn sender's lp tokens
     this.balances.burn(lpToken, liquidity);
     // TODO: Check if pool reserves are empty and delete the pool if so
@@ -265,7 +275,7 @@ export class XYK extends RuntimeModule<unknown> {
     const numerator = amountIn.mul(reserveOut);
     const denominator = reserveIn.add(amountIn);
 
-    return this.safeDiv(numerator, denominator);
+    return this.safeDiv(numerator, denominator, Bool(true));
   }
 
   public calculateAmountIn(
@@ -287,12 +297,12 @@ export class XYK extends RuntimeModule<unknown> {
     amountOut: Balance,
   ) {
     const numerator = reserveIn.mul(amountOut);
-    const denominator = this.safeSub(reserveOut, amountOut);
+    const denominator = this.safeSub(reserveOut, amountOut, Bool(true));
     return Provable.if(
       denominator.equals(Balance.zero),
       Balance,
       Balance.zero,
-      this.safeDiv(numerator, denominator),
+      this.safeDiv(numerator, denominator, Bool(false)),
     );
   }
 
@@ -417,12 +427,16 @@ export class XYK extends RuntimeModule<unknown> {
     return path;
   }
 
-  public safeSub(minuend: UInt64, subtrahend: UInt64): UInt64 {
-    const minuendSufficiency = minuend.greaterThanOrEqual(subtrahend);
-    assert(minuendSufficiency, errors.subtractionUnderflow());
+  public safeSub(minuend: UInt64, subtrahend: UInt64, revert: Bool): UInt64 {
+    const isMinuendSufficient = minuend.greaterThanOrEqual(subtrahend);
+    // Revert if minuend is insufficient and revert is true
+    assert(
+      isMinuendSufficient.not().and(revert).not(),
+      errors.subtractionUnderflow(),
+    );
 
     const safeMinuend = Provable.if(
-      minuendSufficiency,
+      isMinuendSufficient,
       UInt64,
       minuend,
       minuend.add(subtrahend),
@@ -431,21 +445,16 @@ export class XYK extends RuntimeModule<unknown> {
     return safeMinuend.sub(subtrahend);
   }
 
-  public safeDiv(numerator: UInt64, denominator: UInt64): UInt64 {
-    const safeDenominator = this.getSafeDenominator(denominator);
+  public safeDiv(numerator: UInt64, denominator: UInt64, revert: Bool): UInt64 {
+    const safeDenominator = this.getSafeDenominator(denominator, revert);
     return numerator.div(safeDenominator);
   }
 
-  public getSafeDenominator(denominator: UInt64): UInt64 {
-    const isDenominatorNotZero = denominator.equals(UInt64.zero).not();
-    // TODO: make assertion optional
-    // assert(isDenominatorNotZero, errors.divisionByZero());
+  public getSafeDenominator(denominator: UInt64, revert: Bool): UInt64 {
+    const isDenominatorZero = denominator.equals(UInt64.zero);
+    // Revert if denominator is zero and revert is true
+    assert(isDenominatorZero.and(revert).not(), errors.divisionByZero());
 
-    return Provable.if(
-      isDenominatorNotZero,
-      UInt64,
-      denominator,
-      UInt64.from(1),
-    );
+    return Provable.if(isDenominatorZero, UInt64, UInt64.from(1), denominator);
   }
 }
