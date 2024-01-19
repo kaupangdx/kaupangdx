@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { InMemorySigner, TestingAppChain } from "@proto-kit/sdk";
-import { PrivateKey, UInt64 } from "o1js";
-import { Balances, BalancesKey, TokenId } from "./Balances";
+import { PrivateKey } from "o1js";
+import { Balances } from "./Balances";
 import { log } from "@proto-kit/common";
 import { Admin } from "./Admin";
 
@@ -18,7 +18,8 @@ describe("Admin", () => {
   const alice = alicePrivateKey.toPublicKey();
   const bobPrivateKey = PrivateKey.random();
   const bob = bobPrivateKey.toPublicKey();
-  const tokenId = TokenId.from(0);
+  const treasuryPrivateKey = PrivateKey.random();
+  const treasury = treasuryPrivateKey.toPublicKey();
 
   beforeAll(async () => {
     appChain = TestingAppChain.fromRuntime({
@@ -78,6 +79,24 @@ describe("Admin", () => {
       expect(block?.txs[0].status).toBe(false);
       expect(block?.txs[0].statusMessage).toMatch(/Sender is not admin/);
       expect(currentAdmin?.toBase58()).toBe(alice.toBase58());
+    });
+  });
+
+  describe("setTreasury", () => {
+    it("should set treasury", async () => {
+      const tx = await appChain.transaction(alice, () => {
+        admin.setTreasury(treasury);
+      });
+
+      await tx.sign();
+      await tx.send();
+
+      const block = await appChain.produceBlock();
+
+      const currentTreasury = await appChain.query.runtime.Admin.treasury.get();
+
+      expect(block?.txs[0].status).toBe(true);
+      expect(currentTreasury?.toBase58()).toBe(treasury.toBase58());
     });
   });
 });

@@ -4,18 +4,26 @@ import { Bool, PublicKey } from "o1js";
 
 export class Admin extends RuntimeModule<unknown> {
   @state() public admin = State.from<PublicKey>(PublicKey);
+  @state() public treasury = State.from<PublicKey>(PublicKey);
 
   @runtimeMethod()
   public setAdmin(newAdmin: PublicKey) {
     const [isSenderAdmin, admin] = this.isSenderAdmin();
 
     // allow setting only if empty, or if the sender is admin
+    // TODO: fix race condition vuln
     assert(
       admin.isSome.not().or(isSenderAdmin),
       "Sender is not admin, or the admin is not empty",
     );
 
     this.admin.set(newAdmin);
+  }
+
+  @runtimeMethod()
+  public setTreasury(newTreasury: PublicKey) {
+    this.assertIsSenderAdmin();
+    this.treasury.set(newTreasury);
   }
 
   public isSenderAdmin(): [Bool, Option<PublicKey>] {
