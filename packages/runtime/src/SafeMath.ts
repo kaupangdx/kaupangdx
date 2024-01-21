@@ -1,11 +1,5 @@
-import {
-  RuntimeModule,
-} from "@proto-kit/module";
-import {
-  Provable,
-  Bool,
-  UInt64,
-} from "o1js";
+import { RuntimeModule, runtimeMethod } from "@proto-kit/module";
+import { Provable, Bool, UInt64 } from "o1js";
 import { assert } from "@proto-kit/protocol";
 
 export const errors = {
@@ -14,7 +8,8 @@ export const errors = {
 };
 
 export class SafeMath extends RuntimeModule<unknown> {
-  public static safeSub(minuend: UInt64, subtrahend: UInt64, revert: Bool): UInt64 {
+  @runtimeMethod()
+  public safeSub(minuend: UInt64, subtrahend: UInt64, revert: Bool): UInt64 {
     const isMinuendSufficient = minuend.greaterThanOrEqual(subtrahend);
     // Revert if minuend is insufficient and revert is true
     assert(
@@ -32,12 +27,14 @@ export class SafeMath extends RuntimeModule<unknown> {
     return safeMinuend.sub(subtrahend);
   }
 
-  public static safeDiv(numerator: UInt64, denominator: UInt64, revert: Bool): UInt64 {
+  @runtimeMethod()
+  public safeDiv(numerator: UInt64, denominator: UInt64, revert: Bool): UInt64 {
     const safeDenominator = this.getSafeDenominator(denominator, revert);
     return numerator.div(safeDenominator);
   }
 
-  public static getSafeDenominator(denominator: UInt64, revert: Bool): UInt64 {
+  @runtimeMethod()
+  public getSafeDenominator(denominator: UInt64, revert: Bool): UInt64 {
     const isDenominatorZero = denominator.equals(UInt64.zero);
     // Revert if denominator is zero and revert is true
     assert(isDenominatorZero.and(revert).not(), errors.divisionByZero());
@@ -45,4 +42,3 @@ export class SafeMath extends RuntimeModule<unknown> {
     return Provable.if(isDenominatorZero, UInt64, UInt64.from(1), denominator);
   }
 }
-

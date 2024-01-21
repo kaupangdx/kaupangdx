@@ -11,7 +11,7 @@ import { Admin } from "./Admin";
 import { SafeMath } from "./SafeMath";
 
 export const errors = {
-  unauthorizedSender: () => "Unauthorized sender"
+  unauthorizedSender: () => "Unauthorized sender",
 };
 
 export class TokenId extends Field {}
@@ -36,7 +36,10 @@ export class Balances extends RuntimeModule<unknown> {
 
   @state() public supply = StateMap.from<TokenId, Balance>(TokenId, Balance);
 
-  public constructor(@inject("Admin") public admin: Admin) {
+  public constructor(
+    @inject("Admin") public admin: Admin,
+    @inject("SafeMath") public safeMath: SafeMath,
+  ) {
     super();
   }
 
@@ -72,7 +75,11 @@ export class Balances extends RuntimeModule<unknown> {
     const toBalance = this.getBalance(tokenId, to);
 
     // Set balances
-    this.setBalance(tokenId, from, SafeMath.safeSub(fromBalance, amount, Bool(true)));
+    this.setBalance(
+      tokenId,
+      from,
+      this.safeMath.safeSub(fromBalance, amount, Bool(true)),
+    );
     this.setBalance(tokenId, to, toBalance.add(amount));
   }
 
@@ -101,8 +108,12 @@ export class Balances extends RuntimeModule<unknown> {
     const balance = this.getBalance(tokenId, sender);
     const supply = this.getSupply(tokenId);
 
-    this.setBalance(tokenId, sender, SafeMath.safeSub(balance, amount, Bool(true)));
-    this.supply.set(tokenId, SafeMath.safeSub(supply, amount, Bool(true)));
+    this.setBalance(
+      tokenId,
+      sender,
+      this.safeMath.safeSub(balance, amount, Bool(true)),
+    );
+    this.supply.set(tokenId, this.safeMath.safeSub(supply, amount, Bool(true)));
   }
 
   @runtimeMethod()
