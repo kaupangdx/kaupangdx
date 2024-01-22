@@ -4,7 +4,6 @@ import { PrivateKey, UInt64 } from "o1js";
 import { Balances, BalancesKey, TokenId } from "./Balances";
 import { log } from "@proto-kit/common";
 import { Admin } from "./Admin";
-import { SafeMath } from "./SafeMath";
 
 log.setLevel("ERROR");
 
@@ -12,7 +11,6 @@ describe("Balances", () => {
   let appChain: TestingAppChain<{
     Balances: typeof Balances;
     Admin: typeof Admin;
-    SafeMath: typeof SafeMath;
   }>;
   let balances: Balances;
   let admin: Admin;
@@ -32,12 +30,10 @@ describe("Balances", () => {
       modules: {
         Balances,
         Admin,
-        SafeMath,
       },
       config: {
         Balances: {},
         Admin: {},
-        SafeMath: {},
       },
     });
 

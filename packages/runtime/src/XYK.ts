@@ -18,6 +18,7 @@ import {
 } from "o1js";
 import { Balance, Balances, TokenId } from "./Balances";
 import { inject } from "tsyringe";
+import { SafeMath } from "./SafeMath";
 
 export class TokenPair extends Struct({
   tokenA: TokenId,
@@ -148,7 +149,7 @@ export class XYK extends RuntimeModule<unknown> {
     const reserveA = this.balances.getBalance(tokenA, pool);
     const reserveB = this.balances.getBalance(tokenB, pool);
 
-    const amountB = this.balances.safeMath.safeDiv(
+    const amountB = SafeMath.safeDiv(
       amountA.mul(reserveB),
       reserveA,
       Bool(true),
@@ -166,12 +167,12 @@ export class XYK extends RuntimeModule<unknown> {
     this.balances.setBalance(
       tokenA,
       sender,
-      this.balances.safeMath.safeSub(senderBalanceA, amountA, Bool(true)),
+      SafeMath.safeSub(senderBalanceA, amountA, Bool(true)),
     );
     this.balances.setBalance(
       tokenB,
       sender,
-      this.balances.safeMath.safeSub(senderBalanceB, amountB, Bool(true)),
+      SafeMath.safeSub(senderBalanceB, amountB, Bool(true)),
     );
 
     this.balances.setBalance(tokenA, pool, reserveA.add(amountA));
@@ -180,12 +181,12 @@ export class XYK extends RuntimeModule<unknown> {
     const lpToken = LPTokenId.fromTokenPair(tokenA, tokenB);
     const totalSupply = this.balances.getSupply(lpToken);
 
-    const liqA = this.balances.safeMath.safeDiv(
+    const liqA = SafeMath.safeDiv(
       amountA.mul(totalSupply),
       reserveA,
       Bool(true),
     );
-    const liqB = this.balances.safeMath.safeDiv(
+    const liqB = SafeMath.safeDiv(
       amountB.mul(totalSupply),
       reserveB,
       Bool(true),
@@ -216,7 +217,7 @@ export class XYK extends RuntimeModule<unknown> {
     const reserveA = this.balances.getBalance(tokenA, pool);
     const reserveB = this.balances.getBalance(tokenB, pool);
 
-    const totalSupply = this.balances.safeMath.getSafeDenominator(
+    const totalSupply = SafeMath.getSafeDenominator(
       this.balances.getSupply(lpToken),
       Bool(true),
     );
@@ -248,12 +249,12 @@ export class XYK extends RuntimeModule<unknown> {
     this.balances.setBalance(
       tokenA,
       pool,
-      this.balances.safeMath.safeSub(reserveA, amountA, Bool(true)),
+      SafeMath.safeSub(reserveA, amountA, Bool(true)),
     );
     this.balances.setBalance(
       tokenB,
       pool,
-      this.balances.safeMath.safeSub(reserveB, amountB, Bool(true)),
+      SafeMath.safeSub(reserveB, amountB, Bool(true)),
     );
     // Burn sender's lp tokens
     this.balances.burn(lpToken, liquidity);
@@ -285,7 +286,7 @@ export class XYK extends RuntimeModule<unknown> {
     const numerator = amountIn.mul(reserveOut);
     const denominator = reserveIn.add(amountIn);
 
-    return this.balances.safeMath.safeDiv(numerator, denominator, Bool(true));
+    return SafeMath.safeDiv(numerator, denominator, Bool(true));
   }
 
   public calculateAmountIn(
@@ -307,7 +308,7 @@ export class XYK extends RuntimeModule<unknown> {
     amountOut: Balance,
   ) {
     const numerator = reserveIn.mul(amountOut);
-    const denominator = this.balances.safeMath.safeSub(
+    const denominator = SafeMath.safeSub(
       reserveOut,
       amountOut,
       Bool(true),
@@ -316,7 +317,7 @@ export class XYK extends RuntimeModule<unknown> {
       denominator.equals(Balance.zero),
       Balance,
       Balance.zero,
-      this.balances.safeMath.safeDiv(numerator, denominator, Bool(false)),
+      SafeMath.safeDiv(numerator, denominator, Bool(false)),
     );
   }
 

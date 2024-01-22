@@ -37,8 +37,7 @@ export class Balances extends RuntimeModule<unknown> {
   @state() public supply = StateMap.from<TokenId, Balance>(TokenId, Balance);
 
   public constructor(
-    @inject("Admin") public admin: Admin,
-    @inject("SafeMath") public safeMath: SafeMath,
+    @inject("Admin") public admin: Admin
   ) {
     super();
   }
@@ -78,7 +77,7 @@ export class Balances extends RuntimeModule<unknown> {
     this.setBalance(
       tokenId,
       from,
-      this.safeMath.safeSub(fromBalance, amount, Bool(true)),
+      SafeMath.safeSub(fromBalance, amount, Bool(true)),
     );
     this.setBalance(tokenId, to, toBalance.add(amount));
   }
@@ -111,9 +110,9 @@ export class Balances extends RuntimeModule<unknown> {
     this.setBalance(
       tokenId,
       sender,
-      this.safeMath.safeSub(balance, amount, Bool(true)),
+      SafeMath.safeSub(balance, amount, Bool(true)),
     );
-    this.supply.set(tokenId, this.safeMath.safeSub(supply, amount, Bool(true)));
+    this.supply.set(tokenId, SafeMath.safeSub(supply, amount, Bool(true)));
   }
 
   @runtimeMethod()

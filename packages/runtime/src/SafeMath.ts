@@ -1,4 +1,3 @@
-import { RuntimeModule, runtimeMethod } from "@proto-kit/module";
 import { Provable, Bool, UInt64 } from "o1js";
 import { assert } from "@proto-kit/protocol";
 
@@ -7,9 +6,8 @@ export const errors = {
   divisionByZero: () => "Division by zero",
 };
 
-export class SafeMath extends RuntimeModule<unknown> {
-  @runtimeMethod()
-  public safeSub(minuend: UInt64, subtrahend: UInt64, revert: Bool): UInt64 {
+export class SafeMath {
+  public static safeSub(minuend: UInt64, subtrahend: UInt64, revert: Bool): UInt64 {
     const isMinuendSufficient = minuend.greaterThanOrEqual(subtrahend);
     // Revert if minuend is insufficient and revert is true
     assert(
@@ -27,14 +25,12 @@ export class SafeMath extends RuntimeModule<unknown> {
     return safeMinuend.sub(subtrahend);
   }
 
-  @runtimeMethod()
-  public safeDiv(numerator: UInt64, denominator: UInt64, revert: Bool): UInt64 {
+  public static safeDiv(numerator: UInt64, denominator: UInt64, revert: Bool): UInt64 {
     const safeDenominator = this.getSafeDenominator(denominator, revert);
     return numerator.div(safeDenominator);
   }
 
-  @runtimeMethod()
-  public getSafeDenominator(denominator: UInt64, revert: Bool): UInt64 {
+  public static getSafeDenominator(denominator: UInt64, revert: Bool): UInt64 {
     const isDenominatorZero = denominator.equals(UInt64.zero);
     // Revert if denominator is zero and revert is true
     assert(isDenominatorZero.and(revert).not(), errors.divisionByZero());

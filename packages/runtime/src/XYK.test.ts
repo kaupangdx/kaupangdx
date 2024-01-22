@@ -4,13 +4,11 @@ import { PrivateKey, PublicKey } from "o1js";
 import { Balance, Balances, BalancesKey, TokenId } from "./Balances";
 import { LPTokenId, PoolKey, XYK, WrappedPath } from "./XYK";
 import { Admin } from "./Admin";
-import { SafeMath } from "./SafeMath";
 
 type RuntimeModules = {
   Balances: typeof Balances;
   XYK: typeof XYK;
   Admin: typeof Admin;
-  SafeMath: typeof SafeMath;
 };
 
 let nonce = 0;
@@ -31,7 +29,6 @@ describe("xyk", () => {
   let balances: Balances;
   let xyk: XYK;
   let admin: Admin;
-  let safeMath: SafeMath;
 
   const balanceToMint = 10_000n;
   const initialLiquidityA = 1000n;
@@ -57,13 +54,11 @@ describe("xyk", () => {
         Balances,
         XYK,
         Admin,
-        SafeMath,
       },
       config: {
         Balances: {},
         XYK: {},
         Admin: {},
-        SafeMath: {},
       },
     });
 
@@ -73,7 +68,6 @@ describe("xyk", () => {
     balances = appChain.runtime.resolve("Balances");
     xyk = appChain.runtime.resolve("XYK");
     admin = appChain.runtime.resolve("Admin");
-    safeMath = appChain.runtime.resolve("SafeMath");
 
     const tx = await appChain.transaction(alice, () => {
       admin.setAdmin(alice);

@@ -1,70 +1,66 @@
 import "reflect-metadata";
-import { TestingAppChain } from "@proto-kit/sdk";
-import { PrivateKey, UInt64, Bool } from "o1js";
+import { RuntimeMethodExecutionContext } from "@proto-kit/protocol";
+import { UInt64, Bool } from "o1js";
 import { log } from "@proto-kit/common";
 import { SafeMath, errors } from "./SafeMath";
+import { container } from "tsyringe";
 
 log.setLevel("ERROR");
 
 describe("SafeMath", () => {
-  let appChain: TestingAppChain<{
-    SafeMath: typeof SafeMath;
-  }>;
 
-  let safeMath: SafeMath;
-
-  const alicePrivateKey = PrivateKey.random();
-  const alice = alicePrivateKey.toPublicKey();
-
+  const a: UInt64 = UInt64.from(10);
   let revert = Bool(true);
 
-  beforeAll(async () => {
-    appChain = TestingAppChain.fromRuntime({
-      modules: {
-        SafeMath,
-      },
-      config: {
-        SafeMath: {},
-      },
-    });
+  const executionContext = container.resolve<RuntimeMethodExecutionContext>(
+    RuntimeMethodExecutionContext
+  );
 
-    await appChain.start();
+  beforeEach(async () => {
+    executionContext.clear();
+    executionContext.setup({} as any);
+  })
 
-    appChain.setSigner(alicePrivateKey);
-    safeMath = appChain.runtime.resolve("SafeMath");
-  });
-
-  describe("Safe Division", () => {
+  describe("safeDiv", () => {
     it("Should divide", async () => {
       const a: UInt64 = UInt64.from(10);
       const b: UInt64 = UInt64.from(2);
 
-      const tx = await appChain.transaction(alice, () => {
-        safeMath.safeDiv(a, b, revert);
-      });
+      const c: UInt64 = SafeMath.safeDiv(a, b, revert);
 
-      await tx.sign();
-      await tx.send();
-
-      const block = await appChain.produceBlock();
-
-      expect(block?.txs[0].status).toBe(true);
+      expect(executionContext.result.status.toBoolean()).toBe(true);
+      expect(c.toBigInt()).toBe(5n);
     });
 
-    it("Should not divide by zero", async () => {
-      const a: UInt64 = UInt64.from(10);
+    it("Should revert wtih division by zero", async () => {
       const b: UInt64 = UInt64.from(0);
 
-      const tx = await appChain.transaction(alice, () => {
-        safeMath.safeDiv(a, b, revert);
-      });
+      const c: UInt64 = SafeMath.safeDiv(a, b, revert);
 
-      await tx.sign();
-      await tx.send();
+      expect(executionContext.result.status.toBoolean()).toBe(false);
+      expect(executionContext.result.statusMessage).toBe(errors.divisionByZero());
+      expect(c.toBigInt()).toBe(10n);
+    });
+  });
 
-      const block = await appChain.produceBlock();
-      expect(block?.txs[0].status).toBe(false);
-      expect(block?.txs[0].statusMessage).toBe(errors.divisionByZero());
+  describe("safeSub", () => {
+    it("Should subtract", async () => {
+      const b: UInt64 = UInt64.from(2);
+
+      const c: UInt64 = SafeMath.safeSub(a, b, revert);
+
+      expect(executionContext.result.status.toBoolean()).toBe(true);
+      expect(c.toBigInt()).toBe(8n);
+    });
+
+    it("Should revert with subtraction underflow", async () => {
+      const b: UInt64 = UInt64.from(11);
+
+      const c: UInt64 = SafeMath.safeSub(a, b, revert);
+
+      expect(executionContext.result.status.toBoolean()).toBe(false);
+      expect(executionContext.result.statusMessage).toBe(errors.subtractionUnderflow());
+      expect(c.toBigInt()).toBe(10n);
     });
   });
 });
