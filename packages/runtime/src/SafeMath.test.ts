@@ -8,22 +8,20 @@ import { container } from "tsyringe";
 log.setLevel("ERROR");
 
 describe("SafeMath", () => {
-
   const a: UInt64 = UInt64.from(10);
-  let revert = Bool(true);
+  const revert = Bool(true);
 
   const executionContext = container.resolve<RuntimeMethodExecutionContext>(
-    RuntimeMethodExecutionContext
+    RuntimeMethodExecutionContext,
   );
 
   beforeEach(async () => {
     executionContext.clear();
     executionContext.setup({} as any);
-  })
+  });
 
   describe("safeDiv", () => {
     it("Should divide", async () => {
-      const a: UInt64 = UInt64.from(10);
       const b: UInt64 = UInt64.from(2);
 
       const c: UInt64 = SafeMath.safeDiv(a, b, revert);
@@ -38,7 +36,9 @@ describe("SafeMath", () => {
       const c: UInt64 = SafeMath.safeDiv(a, b, revert);
 
       expect(executionContext.result.status.toBoolean()).toBe(false);
-      expect(executionContext.result.statusMessage).toBe(errors.divisionByZero());
+      expect(executionContext.result.statusMessage).toBe(
+        errors.divisionByZero(),
+      );
       expect(c.toBigInt()).toBe(10n);
     });
 
@@ -77,7 +77,9 @@ describe("SafeMath", () => {
       const c: UInt64 = SafeMath.safeSub(a, b, revert);
 
       expect(executionContext.result.status.toBoolean()).toBe(false);
-      expect(executionContext.result.statusMessage).toBe(errors.subtractionUnderflow());
+      expect(executionContext.result.statusMessage).toBe(
+        errors.subtractionUnderflow(),
+      );
       expect(c.toBigInt()).toBe(10n);
     });
   });

@@ -308,11 +308,7 @@ export class XYK extends RuntimeModule<unknown> {
     amountOut: Balance,
   ) {
     const numerator = reserveIn.mul(amountOut);
-    const denominator = SafeMath.safeSub(
-      reserveOut,
-      amountOut,
-      Bool(true),
-    );
+    const denominator = SafeMath.safeSub(reserveOut, amountOut, Bool(true));
     return Provable.if(
       denominator.equals(Balance.zero),
       Balance,

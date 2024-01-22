@@ -7,7 +7,11 @@ export const errors = {
 };
 
 export class SafeMath {
-  public static safeSub(minuend: UInt64, subtrahend: UInt64, revert: Bool): UInt64 {
+  public static safeSub(
+    minuend: UInt64,
+    subtrahend: UInt64,
+    revert: Bool,
+  ): UInt64 {
     const isMinuendSufficient = minuend.greaterThanOrEqual(subtrahend);
     // Revert if minuend is insufficient and revert is true
     assert(
@@ -25,7 +29,11 @@ export class SafeMath {
     return safeMinuend.sub(subtrahend);
   }
 
-  public static safeDiv(numerator: UInt64, denominator: UInt64, revert: Bool): UInt64 {
+  public static safeDiv(
+    numerator: UInt64,
+    denominator: UInt64,
+    revert: Bool,
+  ): UInt64 {
     const safeDenominator = this.getSafeDenominator(denominator, revert);
     return numerator.div(safeDenominator);
   }

@@ -36,9 +36,7 @@ export class Balances extends RuntimeModule<unknown> {
 
   @state() public supply = StateMap.from<TokenId, Balance>(TokenId, Balance);
 
-  public constructor(
-    @inject("Admin") public admin: Admin
-  ) {
+  public constructor(@inject("Admin") public admin: Admin) {
     super();
   }
 
