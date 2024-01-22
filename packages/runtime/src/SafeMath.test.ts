@@ -41,6 +41,24 @@ describe("SafeMath", () => {
       expect(executionContext.result.statusMessage).toBe(errors.divisionByZero());
       expect(c.toBigInt()).toBe(10n);
     });
+
+    it("Should get safe denominator with n!=0, returns n", async () => {
+      const b: UInt64 = UInt64.from(2);
+
+      const c: UInt64 = SafeMath.getSafeDenominator(b, revert.not());
+
+      expect(executionContext.result.status.toBoolean()).toBe(true);
+      expect(c.toBigInt()).toBe(2n);
+    });
+
+    it("Should get safe denominator with n==0, returns 1", async () => {
+      const b: UInt64 = UInt64.from(0);
+
+      const c: UInt64 = SafeMath.getSafeDenominator(b, revert.not());
+
+      expect(executionContext.result.status.toBoolean()).toBe(true);
+      expect(c.toBigInt()).toBe(1n);
+    });
   });
 
   describe("safeSub", () => {
