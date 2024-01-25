@@ -480,7 +480,7 @@ describe("xyk", () => {
         const amountOut = 150n;
         const amountInBC = (amountOut * reserveBC) / (reserveC - amountOut);
         const amountInAB = (amountInBC * reserveA) / (reserveBA - amountInBC);
-        console.log(amountInAB);
+
         const tx = await appChain.transaction(
           alice,
           () => {
@@ -498,7 +498,6 @@ describe("xyk", () => {
         const block = await appChain.produceBlock();
 
         expect(block?.txs[0].status).toBe(true);
-        console.log(block?.txs[0].statusMessage);
 
         aliceBalanceA -= amountInAB;
         aliceBalanceC += amountOut;
