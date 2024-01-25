@@ -33,11 +33,14 @@ describe("xyk", () => {
   const balanceToMint = 10_000n;
   const initialLiquidityA = 1000n;
   const initialLiquidityB = 2000n;
-  const initialLiquidityC = 2000n;
+  const initialLiquidityC = 3000n;
 
-  let pool: PoolKey;
-  let reserveA = 0n,
-    reserveB = 0n;
+  let poolAB: PoolKey = PoolKey.fromTokenPair(tokenA, tokenB),
+    poolBC: PoolKey = PoolKey.fromTokenPair(tokenB, tokenC);
+  let reserveA = 0n, // Reserve A in A/B pair
+    reserveBA = 0n,  // Reserve B in A/B pair
+    reserveBC = 0n,  // Reserve B in B/C pair
+    reserveC = 0n;   // Reserve C in B/C pair
 
   async function getBalance(tokenId: TokenId, address: PublicKey) {
     return await appChain.query.runtime.Balances.balances.get(
@@ -109,23 +112,31 @@ describe("xyk", () => {
 
     expect(block2?.txs[0].status).toBe(true);
 
-    const balanceIn = await getBalance(tokenA, alice);
-    const balanceOut = await getBalance(tokenB, alice);
+    const tx3 = await appChain.transaction(
+      alice,
+      () => {
+        balances.mintAdmin(tokenC, alice, Balance.from(balanceToMint));
+      },
+      { nonce },
+    );
 
-    expect(balanceIn?.toBigInt()).toBe(balanceToMint);
-    expect(balanceOut?.toBigInt()).toBe(balanceToMint);
+    await tx3.sign();
+    await tx3.send();
+    const block3 = await appChain.produceBlock();
+
+    expect(block3?.txs[0].status).toBe(true);
+
+    const balanceA = await getBalance(tokenA, alice);
+    const balanceB = await getBalance(tokenB, alice);
+    const balanceC = await getBalance(tokenC, alice);
+
+    expect(balanceA?.toBigInt()).toBe(balanceToMint);
+    expect(balanceB?.toBigInt()).toBe(balanceToMint);
+    expect(balanceC?.toBigInt()).toBe(balanceToMint);
   });
 
   describe("pool interactions", () => {
-    afterEach(async () => {
-      // Check reserves
-      expect((await getBalance(tokenA, pool))?.toBigInt()).toBe(reserveA);
-      expect((await getBalance(tokenB, pool))?.toBigInt()).toBe(reserveB);
-      // Log reserves
-      // console.log("Reserves:", reserveA, reserveB);
-    });
-
-    it("should create a pool", async () => {
+    it("should create an A/B pair", async () => {
       const tx = await appChain.transaction(
         alice,
         () => {
@@ -160,13 +171,57 @@ describe("xyk", () => {
           : initialLiquidityB,
       );
 
-      pool = PoolKey.fromTokenPair(tokenA, tokenB);
+      poolAB = PoolKey.fromTokenPair(tokenA, tokenB);
 
       reserveA = initialLiquidityA;
-      reserveB = initialLiquidityB;
+      reserveBA = initialLiquidityB;
 
-      expect((await getBalance(tokenA, pool))?.toBigInt()).toBe(reserveA);
-      expect((await getBalance(tokenB, pool))?.toBigInt()).toBe(reserveB);
+      expect((await getBalance(tokenA, poolAB))?.toBigInt()).toBe(reserveA);
+      expect((await getBalance(tokenB, poolAB))?.toBigInt()).toBe(reserveBA);
+    });
+
+    it("should create a B/C pair", async () => {
+      const tx = await appChain.transaction(
+        alice,
+        () => {
+          xyk.createPool(
+            tokenB,
+            tokenC,
+            Balance.from(initialLiquidityB),
+            Balance.from(initialLiquidityC),
+          );
+        },
+        { nonce },
+      );
+
+      await tx.sign();
+      await tx.send();
+      const block = await appChain.produceBlock();
+
+      expect(block?.txs[0].status).toBe(true);
+
+      const balanceB = await getBalance(tokenB, alice);
+      const balanceC = await getBalance(tokenC, alice);
+      const balanceLP = await getBalance(
+        LPTokenId.fromTokenPair(tokenB, tokenC),
+        alice,
+      );
+
+      expect(balanceB?.toBigInt()).toBe(balanceToMint - initialLiquidityB * 2n);
+      expect(balanceC?.toBigInt()).toBe(balanceToMint - initialLiquidityC);
+      expect(balanceLP?.toBigInt()).toBe(
+        initialLiquidityB < initialLiquidityC
+          ? initialLiquidityB
+          : initialLiquidityC,
+      );
+
+      poolBC = PoolKey.fromTokenPair(tokenB, tokenC);
+
+      reserveBC = initialLiquidityB;
+      reserveC = initialLiquidityC;
+
+      expect((await getBalance(tokenB, poolBC))?.toBigInt()).toBe(reserveBC);
+      expect((await getBalance(tokenC, poolBC))?.toBigInt()).toBe(reserveC);
     });
 
     it("should not create a pool, if one already exists", async () => {
@@ -192,6 +247,16 @@ describe("xyk", () => {
     });
 
     describe("liquidity management", () => {
+      afterEach(async () => {
+        // Check reserves
+        expect((await getBalance(tokenA, poolAB))?.toBigInt()).toBe(reserveA);
+        expect((await getBalance(tokenB, poolAB))?.toBigInt()).toBe(reserveBA);
+        expect((await getBalance(tokenB, poolBC))?.toBigInt()).toBe(reserveBC);
+        expect((await getBalance(tokenC, poolBC))?.toBigInt()).toBe(reserveC);
+        // Log reserves
+        // console.log("Reserves:", reserveA, reserveB);
+      });
+
       let lpAddition: Balance,
         amountA: Balance,
         amountB: Balance,
@@ -246,14 +311,14 @@ describe("xyk", () => {
           balanceToMint - initialLiquidityA - amountA.toBigInt(),
         );
         expect(balanceB?.toBigInt()).toBe(
-          balanceToMint - initialLiquidityB - amountB.toBigInt(),
+          balanceToMint - initialLiquidityB * 2n - amountB.toBigInt(),
         );
         expect(balanceLP?.toBigInt()).toBe(
           initialBalanceLP.add(lpAddition).toBigInt(),
         );
 
         reserveA += amountA.toBigInt();
-        reserveB += amountB.toBigInt();
+        reserveBA += amountB.toBigInt();
       });
 
       it("should remove liquidity", async () => {
@@ -279,17 +344,18 @@ describe("xyk", () => {
         );
 
         expect(balanceA?.toBigInt()).toBe(balanceToMint - initialLiquidityA);
-        expect(balanceB?.toBigInt()).toBe(balanceToMint - initialLiquidityB);
+        expect(balanceB?.toBigInt()).toBe(balanceToMint - initialLiquidityB * 2n); // Second pool
         expect(balanceLP?.toBigInt()).toBe(initialBalanceLP.toBigInt());
 
         reserveA -= amountA.toBigInt();
-        reserveB -= amountB.toBigInt();
+        reserveBA -= amountB.toBigInt();
       });
     });
 
     describe("swap", () => {
       let aliceBalanceA = balanceToMint - initialLiquidityA;
-      let aliceBalanceB = balanceToMint - initialLiquidityB;
+      let aliceBalanceB = balanceToMint - initialLiquidityB * 2n;
+      let aliceBalanceC = balanceToMint - initialLiquidityC;
 
       const wrappedPath = new WrappedPath({ path: [tokenA, tokenB] });
       const dummies: TokenId[] = Array(10 - wrappedPath.path.length).fill(
@@ -299,7 +365,7 @@ describe("xyk", () => {
 
       it("should swap exact A for B", async () => {
         const amountIn = 100n;
-        const amountOut = (amountIn * reserveB) / (amountIn + reserveA); //minAmountOut but is exact amount out
+        const amountOut = (amountIn * reserveBA) / (amountIn + reserveA); //minAmountOut but is exact amount out
         const tx = await appChain.transaction(
           alice,
           () => {
@@ -329,13 +395,13 @@ describe("xyk", () => {
         expect(balanceB?.toBigInt()).toBe(aliceBalanceB);
 
         reserveA += amountIn;
-        reserveB -= amountOut;
+        reserveBA -= amountOut;
       });
 
       it("should swap A for exact B", async () => {
         const maxAmountIn = 100n;
         const amountOut = 150n;
-        const amountIn = (amountOut * reserveA) / (reserveB - amountOut);
+        const amountIn = (amountOut * reserveA) / (reserveBA - amountOut);
         const tx = await appChain.transaction(
           alice,
           () => {
@@ -364,7 +430,89 @@ describe("xyk", () => {
         expect(balanceB?.toBigInt()).toBe(aliceBalanceB);
 
         reserveA += amountIn;
-        reserveB -= amountOut;
+        reserveBA -= amountOut;
+      });
+
+      it("should swap exact A for C", async () => {
+        const amountIn = 100n;
+        const amountOutAB = (amountIn * reserveBA) / (amountIn + reserveA);
+        const amountOutBC = (amountOutAB * reserveC) / (amountOutAB + reserveBC);
+
+        // Add tokenC to the path
+        wrappedPath.path[2] = tokenC;
+
+        const tx = await appChain.transaction(
+          alice,
+          () => {
+            xyk.swapExactTokensForTokens(
+              Balance.from(amountIn),
+              Balance.from(amountOutBC),
+              wrappedPath,
+            );
+          },
+          { nonce },
+        );
+
+        await tx.sign();
+        await tx.send();
+        const block = await appChain.produceBlock();
+
+        expect(block?.txs[0].status).toBe(true);
+
+        aliceBalanceA -= amountIn;
+        aliceBalanceC += amountOutBC;
+
+        // Get live balances of Alice
+        const balanceA = await getBalance(tokenA, alice);
+        const balanceC = await getBalance(tokenC, alice);
+
+        expect(balanceA?.toBigInt()).toBe(aliceBalanceA);
+        expect(balanceC?.toBigInt()).toBe(aliceBalanceC);
+
+        reserveA += amountIn;
+        reserveBA -= amountOutAB;
+        reserveBC += amountOutAB;
+        reserveC -= amountOutBC;
+      });
+
+      it("should swap A for exact C", async () => {
+        const maxAmountIn = 200n;
+        const amountOut = 150n;
+        const amountInBC = (amountOut * reserveBC) / (reserveC - amountOut);
+        const amountInAB = (amountInBC * reserveA) / (reserveBA - amountInBC);
+        console.log(amountInAB);
+        const tx = await appChain.transaction(
+          alice,
+          () => {
+            xyk.swapTokensForExactTokens(
+              Balance.from(maxAmountIn),
+              Balance.from(amountOut),
+              wrappedPath,
+            );
+          },
+          { nonce },
+        );
+
+        await tx.sign();
+        await tx.send();
+        const block = await appChain.produceBlock();
+
+        expect(block?.txs[0].status).toBe(true);
+        console.log(block?.txs[0].statusMessage);
+
+        aliceBalanceA -= amountInAB;
+        aliceBalanceC += amountOut;
+
+        const balanceA = await getBalance(tokenA, alice);
+        const balanceC = await getBalance(tokenC, alice);
+
+        expect(balanceA?.toBigInt()).toBe(aliceBalanceA);
+        expect(balanceC?.toBigInt()).toBe(aliceBalanceC);
+
+        reserveA += amountInAB;
+        reserveBA -= amountInBC;
+        reserveBC += amountInBC;
+        reserveC -= amountOut;
       });
     });
   });
