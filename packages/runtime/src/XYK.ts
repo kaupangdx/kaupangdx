@@ -317,7 +317,11 @@ export class XYK extends RuntimeModule<unknown> {
     );
   }
 
-  // 
+  // Transaction sender sends tokens to the first pair in the path.
+  // Pairs then iteratively send tokens to each other until the end of the
+  // path or until the empty slots of the path have been reached.
+  // Last existing pair in the path will send tokens to the transaction
+  // sender in order to close the swap.
   @runtimeMethod()
   public swapExactTokensForTokens(
     amountIn: Balance,
@@ -337,12 +341,14 @@ export class XYK extends RuntimeModule<unknown> {
     let sender = this.transaction.sender;
     let lastTokenOut = TokenId.from(0);
 
-  // First pair that we can find in the path when approaching from the last
-  // index to the first, sends tokens to the transaction sender. Afterwards,
-  // that pair becomes receiver and the pair before it sends tokens to it.
-  // This operation is repeated until the beggining of the path has been reached.
-  // Swap is closed outside of the loop when tokens are sent from transaction
-  // sender to the first pool in the path.
+    // Flow which iteratively swaps tokens across multiple pools until the
+    // end of the path has been reached and the amountOut is known and
+    // greater than minAmountIn.
+    // Algorithm is adapted to the need of having a static sized loop.
+    // We iterate over the path of 10 tokens (9 pools) and skip updating
+    // the values if the pool does not exist, because after the loop
+    // we need to close the swap by sending tokens from the last pool
+    // back to the user.
     for (let i = 0; i < 9; i++) {
       const tokenIn = path[i];
       const tokenOut = path[i + 1];
@@ -381,11 +387,12 @@ export class XYK extends RuntimeModule<unknown> {
     );
   }
 
-  // Transaction sender sends tokens to the first pair in the path.
-  // Pairs then iteratively send tokens to each other until the end of the
-  // path or until the empty slots of the path have been reached.
-  // Last existing pair in the path will send tokens to the transaction
-  // sender in order to close the swap.
+  // First pair that we can find in the path when approaching from the last
+  // index to the first, sends tokens to the transaction sender. Afterwards,
+  // that pair becomes receiver and the pair before it sends tokens to it.
+  // This operation is repeated until the beggining of the path has been reached.
+  // Swap is closed outside of the loop when tokens are sent from transaction
+  // sender to the first pool in the path.
   @runtimeMethod()
   public swapTokensForExactTokens(
     maxAmountIn: Balance,
