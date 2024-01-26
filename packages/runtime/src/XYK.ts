@@ -317,11 +317,19 @@ export class XYK extends RuntimeModule<unknown> {
     );
   }
 
-  // Transaction sender sends tokens to the first pair in the path.
-  // Pairs then iteratively send tokens to each other until the end of the
-  // path or until the empty slots of the path have been reached.
-  // Last existing pair in the path will send tokens to the transaction
-  // sender in order to close the swap.
+  /**
+   * Flow which iteratively swaps tokens across multiple pools until the
+   * end of the path has been reached and the amountOut is known and
+   * greater than minAmountIn.
+   * 
+   * The transaction sender sends tokens to the first pair on the route.
+   * Pairs then iteratively send tokens to each other until the end of
+   * the path or until the empty slots of the path have been reached.
+   * The last existing pair in the path will send tokens to the transaction
+   * sender in order to close the swap.
+   *
+   * Algorithm is adapted to the need of having a static sized loop.
+   */
   @runtimeMethod()
   public swapExactTokensForTokens(
     amountIn: Balance,
@@ -341,14 +349,8 @@ export class XYK extends RuntimeModule<unknown> {
     let sender = this.transaction.sender;
     let lastTokenOut = TokenId.from(0);
 
-    // Flow which iteratively swaps tokens across multiple pools until the
-    // end of the path has been reached and the amountOut is known and
-    // greater than minAmountIn.
-    // Algorithm is adapted to the need of having a static sized loop.
     // We iterate over the path of 10 tokens (9 pools) and skip updating
-    // the values if the pool does not exist, because after the loop
-    // we need to close the swap by sending tokens from the last pool
-    // back to the user.
+    // the values if a pool for the current pair does not exist.
     for (let i = 0; i < 9; i++) {
       const tokenIn = path[i];
       const tokenOut = path[i + 1];
@@ -368,9 +370,9 @@ export class XYK extends RuntimeModule<unknown> {
       );
 
       amountIn = Provable.if(poolExists, Balance, amountIn, Balance.zero);
-      // Sending zero from last sender (pool or EOA) to the lastPool 
-      // if pool for current pair does not exist.
+
       this.balances._transfer(tokenIn, sender, lastPool, amountIn);
+
       sender = lastPool;
       amountIn = amountOut;
     }
@@ -378,7 +380,6 @@ export class XYK extends RuntimeModule<unknown> {
       amountOut.greaterThanOrEqual(minAmountOut),
       errors.amountOutTooLow(),
     );
-    // Closure of a swap with a transfer from last pool the initial sender
     this.balances._transfer(
       lastTokenOut,
       lastPool,
@@ -387,12 +388,20 @@ export class XYK extends RuntimeModule<unknown> {
     );
   }
 
-  // First pair that we can find in the path when approaching from the last
-  // index to the first, sends tokens to the transaction sender. Afterwards,
-  // that pair becomes receiver and the pair before it sends tokens to it.
-  // This operation is repeated until the beggining of the path has been reached.
-  // Swap is closed outside of the loop when tokens are sent from transaction
-  // sender to the first pool in the path.
+  /**
+   * Flow which iteratively swaps tokens in reverse across multiple pools
+   * until the beginning of the path has been reached and amountIn is known
+   * and lower than maxAmountIn.
+   *
+   * First pair that we find in the path when approaching from the last
+   * index sends tokens to the transaction sender. Afterwards, that pair becomes
+   * the receiver and the pair before it sends tokens to it. This operation is
+   * repeated until the beginning of the path has been reached. Swap is closed
+   * outside of the loop when tokens are sent from transaction sender to the
+   * first pool in the path.
+   *
+   * Algorithm is adapted to the need of having a static sized loop.
+   */
   @runtimeMethod()
   public swapTokensForExactTokens(
     maxAmountIn: Balance,
@@ -405,14 +414,8 @@ export class XYK extends RuntimeModule<unknown> {
     const path = this.validateAndUnwrapPath(wrappedPath);
     let receiver = this.transaction.sender;
 
-    // Flow which iteratively swaps tokens in reverse across multiple pools
-    // until the beggining of the path has been reached and amountIn is known
-    // and lower than maxAmountIn.
-    // Algorithm is adapted to the need of having a static sized loop.
     // We iterate over the path of 10 tokens (9 pools) in reverse and skip 
-    // updating the values if the pool does not exist, because after the loop
-    // we need to close the swap by sending tokens from the initial sender
-    // to the first pool / receiver.
+    // updating the values if a pool for the current pair does not exist.
     for (let i = 9; i > 0; i--) {
       const tokenIn = path[i - 1];
       const tokenOut = path[i];
@@ -438,8 +441,6 @@ export class XYK extends RuntimeModule<unknown> {
       receiver = Provable.if(poolExists, PublicKey, pool, receiver);
     }
     assert(amountOut.lessThanOrEqual(maxAmountIn), errors.amountInTooHigh());
-    // Closure of a swap with a transfer from the initial sender to the first 
-    // pool in an array.
     this.balances._transfer(
       path[0],
       this.transaction.sender,
