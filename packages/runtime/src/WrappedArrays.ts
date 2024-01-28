@@ -14,6 +14,20 @@ export const errors = {
   invalidArrayLength: () => "Invalid array length",
 }
 
+export class WrappedTokenIdMatrix extends Struct({
+  matrix: Provable.Array(Provable.Array(TokenId, 10), 10)
+}) {
+  public unwrap(validateLength: Bool) {
+    let matrix = this.matrix;
+    for (let i = 0; i < 10; i++) {
+      let arr = matrix[i];
+      validateArrayLength(arr, validateLength);
+      matrix[i] = arr;
+    }
+    return matrix;
+  }
+}
+
 // TokenId extends Field
 export class WrappedTokenIdArray extends Struct({
   arr: Provable.Array(TokenId, 10)

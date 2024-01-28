@@ -19,7 +19,7 @@ import {
 import { Balance, Balances, TokenId } from "./Balances";
 import { inject } from "tsyringe";
 import { SafeMath } from "./SafeMath";
-import { WrappedTokenIdArray } from "./WrappedArrays";
+import { WrappedTokenIdArray, WrappedBalanceArray, WrappedBoolArray, WrappedTokenIdMatrix } from "./WrappedArrays";
 
 export class TokenPair extends Struct({
   tokenA: TokenId,
@@ -450,5 +450,18 @@ export class XYK extends RuntimeModule<unknown> {
       PoolKey.fromTokenPair(path[0], path[1]),
       amountOut,
     );
+  }
+
+  // TODO: Separate into a different module
+  @runtimeMethod()
+  public multiSwap(
+    wrappedPaths: WrappedTokenIdMatrix,
+    wrappedInAmounts: WrappedBalanceArray, // amountIn / maxAmountIn
+    wrappedOutAmounts: WrappedBalanceArray, // minAmountOut / amountOut
+    wrappedBoolArray: WrappedBoolArray // choice of operation (true == set4t / false == st4et)
+  ) {
+    for (let i = 0; i < 10; i++) {
+        //Provable.if();
+    }
   }
 }
