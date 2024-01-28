@@ -57,8 +57,18 @@ export class LPTokenId extends TokenId {
   }
 }
 
-export class WrappedPath extends Struct({
+// TokenId extends Field
+export class WrappedTokenIdArray extends Struct({
   path: Provable.Array(TokenId, 10),
+}) {}
+
+// Balance extends UInt64
+export class WrappedBalanceArray extends Struct({
+  path: Provable.Array(Balance, 10),
+}) {}
+
+export class WrappedBoolArray extends Struct({
+  path: Provable.Array(Bool, 10),
 }) {}
 
 export const errors = {
@@ -334,7 +344,7 @@ export class XYK extends RuntimeModule<unknown> {
   public swapExactTokensForTokens(
     amountIn: Balance,
     minAmountOut: Balance,
-    wrappedPath: WrappedPath,
+    wrappedPath: WrappedTokenIdArray,
   ) {
     assert(amountIn.greaterThan(Balance.zero), errors.invalidAmountIn());
     assert(
@@ -406,7 +416,7 @@ export class XYK extends RuntimeModule<unknown> {
   public swapTokensForExactTokens(
     maxAmountIn: Balance,
     amountOut: Balance,
-    wrappedPath: WrappedPath,
+    wrappedPath: WrappedTokenIdArray,
   ) {
     assert(maxAmountIn.greaterThan(Balance.zero), errors.invalidMaxAmountIn());
     assert(amountOut.greaterThan(Balance.zero), errors.invalidAmountOut());
@@ -449,7 +459,7 @@ export class XYK extends RuntimeModule<unknown> {
     );
   }
 
-  public validateAndUnwrapPath(wrappedPath: WrappedPath) {
+  public validateAndUnwrapPath(wrappedPath: WrappedTokenIdArray) {
     // Unwrap path
     const path: TokenId[] = wrappedPath.path;
     // Path must have the length of 10
