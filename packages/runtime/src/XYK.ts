@@ -19,7 +19,12 @@ import {
 import { Balance, Balances, TokenId } from "./Balances";
 import { inject } from "tsyringe";
 import { SafeMath } from "./SafeMath";
-import { WrappedTokenIdArray, WrappedBalanceArray, WrappedBoolArray, WrappedTokenIdMatrix } from "./WrappedArrays";
+import {
+  WrappedTokenIdArray,
+  WrappedBalanceArray,
+  WrappedBoolArray,
+  WrappedTokenIdMatrix,
+} from "./WrappedArrays";
 
 export class TokenPair extends Struct({
   tokenA: TokenId,
@@ -317,7 +322,7 @@ export class XYK extends RuntimeModule<unknown> {
    * Flow which iteratively swaps tokens across multiple pools until the
    * end of the path has been reached and the amountOut is known and
    * greater than minAmountIn.
-   * 
+   *
    * The transaction sender sends tokens to the first pair on the route.
    * Pairs then iteratively send tokens to each other until the end of
    * the path or until the empty slots of the path have been reached.
@@ -458,10 +463,10 @@ export class XYK extends RuntimeModule<unknown> {
     wrappedPaths: WrappedTokenIdMatrix,
     wrappedInAmounts: WrappedBalanceArray, // amountIn / maxAmountIn
     wrappedOutAmounts: WrappedBalanceArray, // minAmountOut / amountOut
-    wrappedBoolArray: WrappedBoolArray // choice of operation (true == set4t / false == st4et)
+    wrappedBoolArray: WrappedBoolArray, // choice of operation (true == set4t / false == st4et)
   ) {
     for (let i = 0; i < 10; i++) {
-        //Provable.if();
+      //Provable.if();
     }
   }
 }

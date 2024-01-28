@@ -39,9 +39,9 @@ describe("xyk", () => {
   let poolAB: PoolKey = PoolKey.fromTokenPair(tokenA, tokenB),
     poolBC: PoolKey = PoolKey.fromTokenPair(tokenB, tokenC);
   let reserveA = 0n, // Reserve A in A/B pair
-    reserveBA = 0n,  // Reserve B in A/B pair
-    reserveBC = 0n,  // Reserve B in B/C pair
-    reserveC = 0n;   // Reserve C in B/C pair
+    reserveBA = 0n, // Reserve B in A/B pair
+    reserveBC = 0n, // Reserve B in B/C pair
+    reserveC = 0n; // Reserve C in B/C pair
 
   async function getBalance(tokenId: TokenId, address: PublicKey) {
     return await appChain.query.runtime.Balances.balances.get(
@@ -345,7 +345,9 @@ describe("xyk", () => {
         );
 
         expect(balanceA?.toBigInt()).toBe(balanceToMint - initialLiquidityA);
-        expect(balanceB?.toBigInt()).toBe(balanceToMint - initialLiquidityB * 2n); // Second pool
+        expect(balanceB?.toBigInt()).toBe(
+          balanceToMint - initialLiquidityB * 2n,
+        ); // Second pool
         expect(balanceLP?.toBigInt()).toBe(initialBalanceLP.toBigInt());
 
         reserveA -= amountA.toBigInt();
@@ -437,7 +439,8 @@ describe("xyk", () => {
       it("should swap exact A for C", async () => {
         const amountIn = 100n;
         const amountOutAB = (amountIn * reserveBA) / (amountIn + reserveA);
-        const amountOutBC = (amountOutAB * reserveC) / (amountOutAB + reserveBC);
+        const amountOutBC =
+          (amountOutAB * reserveC) / (amountOutAB + reserveBC);
 
         // Add tokenC to the path
         wrappedPath.arr[2] = tokenC;
