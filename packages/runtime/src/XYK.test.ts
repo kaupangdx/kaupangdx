@@ -2,7 +2,8 @@ import "reflect-metadata";
 import { TestingAppChain } from "@proto-kit/sdk";
 import { PrivateKey, PublicKey } from "o1js";
 import { Balance, Balances, BalancesKey, TokenId } from "./Balances";
-import { LPTokenId, PoolKey, XYK, WrappedTokenIdArray } from "./XYK";
+import { LPTokenId, PoolKey, XYK } from "./XYK";
+import { WrappedTokenIdArray } from "./WrappedArrays";
 import { Admin } from "./Admin";
 
 type RuntimeModules = {
@@ -357,11 +358,11 @@ describe("xyk", () => {
       let aliceBalanceB = balanceToMint - initialLiquidityB * 2n;
       let aliceBalanceC = balanceToMint - initialLiquidityC;
 
-      const wrappedPath = new WrappedTokenIdArray({ path: [tokenA, tokenB] });
-      const dummies: TokenId[] = Array(10 - wrappedPath.path.length).fill(
+      const wrappedPath = new WrappedTokenIdArray({ arr: [tokenA, tokenB] });
+      const dummies: TokenId[] = Array(10 - wrappedPath.arr.length).fill(
         TokenId.from(0),
       );
-      wrappedPath.path = wrappedPath.path.concat(dummies);
+      wrappedPath.arr = wrappedPath.arr.concat(dummies);
 
       it("should swap exact A for B", async () => {
         const amountIn = 100n;
@@ -439,7 +440,7 @@ describe("xyk", () => {
         const amountOutBC = (amountOutAB * reserveC) / (amountOutAB + reserveBC);
 
         // Add tokenC to the path
-        wrappedPath.path[2] = tokenC;
+        wrappedPath.arr[2] = tokenC;
 
         const tx = await appChain.transaction(
           alice,

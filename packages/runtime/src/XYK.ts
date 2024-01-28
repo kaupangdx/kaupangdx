@@ -19,6 +19,7 @@ import {
 import { Balance, Balances, TokenId } from "./Balances";
 import { inject } from "tsyringe";
 import { SafeMath } from "./SafeMath";
+import { WrappedTokenIdArray } from "./WrappedArrays";
 
 export class TokenPair extends Struct({
   tokenA: TokenId,
@@ -57,22 +58,7 @@ export class LPTokenId extends TokenId {
   }
 }
 
-// TokenId extends Field
-export class WrappedTokenIdArray extends Struct({
-  path: Provable.Array(TokenId, 10),
-}) {}
-
-// Balance extends UInt64
-export class WrappedBalanceArray extends Struct({
-  path: Provable.Array(Balance, 10),
-}) {}
-
-export class WrappedBoolArray extends Struct({
-  path: Provable.Array(Bool, 10),
-}) {}
-
 export const errors = {
-  invalidPath: () => "Invalid path",
   insufficientBalances: () => "Insufficient balances",
   tokenASupplyIsZero: () => "Token A supply is zero",
   tokenBSupplyIsZero: () => "Token B supply is zero",
@@ -352,7 +338,10 @@ export class XYK extends RuntimeModule<unknown> {
       errors.invalidMinAmountOut(),
     );
 
-    const path = this.validateAndUnwrapPath(wrappedPath);
+    const path = wrappedPath.unwrap(Bool(true));
+
+    // Assert that path begins with a valid pool
+    this.assertPoolExists(path[0], path[1]);
 
     let amountOut = Balance.zero;
     let lastPool = PoolKey.empty();
@@ -421,10 +410,14 @@ export class XYK extends RuntimeModule<unknown> {
     assert(maxAmountIn.greaterThan(Balance.zero), errors.invalidMaxAmountIn());
     assert(amountOut.greaterThan(Balance.zero), errors.invalidAmountOut());
 
-    const path = this.validateAndUnwrapPath(wrappedPath);
+    const path: TokenId[] = wrappedPath.unwrap(Bool(true));
+
+    // Assert that path begins with a valid pool
+    this.assertPoolExists(path[0], path[1]);
+    // TODO: Enable proper swap flow for paths with 'holes' (ex. [1, 1, 0, 0, 1, 0, 1])
     let receiver = this.transaction.sender;
 
-    // We iterate over the path of 10 tokens (9 pools) in reverse and skip 
+    // We iterate over the path of 10 tokens (9 pools) in reverse and skip
     // updating the values if a pool for the current pair does not exist.
     for (let i = 9; i > 0; i--) {
       const tokenIn = path[i - 1];
@@ -457,19 +450,5 @@ export class XYK extends RuntimeModule<unknown> {
       PoolKey.fromTokenPair(path[0], path[1]),
       amountOut,
     );
-  }
-
-  public validateAndUnwrapPath(wrappedPath: WrappedTokenIdArray) {
-    // Unwrap path
-    const path: TokenId[] = wrappedPath.path;
-    // Path must have the length of 10
-    assert(
-      UInt64.from(path.length).equals(UInt64.from(10)),
-      errors.invalidPath(),
-    );
-    // Assert that path begins with a valid pool
-    this.assertPoolExists(path[0], path[1]);
-
-    return path;
   }
 }
