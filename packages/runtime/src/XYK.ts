@@ -81,10 +81,15 @@ export const errors = {
   invalidAmountOut: () => "Invalid amount out value",
 };
 
+export enum PoolStatus {
+  Enabled,
+  Disabled,
+}
+
 @runtimeModule()
 export class XYK extends RuntimeModule<unknown> {
-  public static defaultPoolValue = Field(0);
   @state() public pools = StateMap.from<PoolKey, Field>(PoolKey, Field);
+  @state() public fees = StateMap.from<UInt64, Bool>(UInt64, Bool); // state map of enabled / settable fees
 
   public constructor(@inject("Balances") public balances: Balances) {
     super();
@@ -94,7 +99,14 @@ export class XYK extends RuntimeModule<unknown> {
     const key = PoolKey.fromTokenPair(tokenA, tokenB);
     const pool = this.pools.get(key);
 
-    return pool.isSome;
+    const poolStatus = Provable.if(
+      pool.isSome,
+      Field,
+      pool.value,
+      Field(PoolStatus.Disabled),
+    );
+
+    return poolStatus.equals(Field(PoolStatus.Enabled));
   }
 
   public assertPoolExists(tokenA: TokenId, tokenB: TokenId) {
@@ -115,7 +127,6 @@ export class XYK extends RuntimeModule<unknown> {
     assert(tokenBSupply.greaterThan(UInt64.zero), errors.tokenBSupplyIsZero());
 
     const poolKey = PoolKey.fromTokenPair(tokenA, tokenB);
-    this.pools.set(poolKey, XYK.defaultPoolValue);
 
     const creator = this.transaction.sender;
 
@@ -132,6 +143,8 @@ export class XYK extends RuntimeModule<unknown> {
 
     // Mint lp tokens to user
     this.balances.mint(lpToken, creator, liquidity);
+    // Enable pool
+    this.pools.set(poolKey, Field(PoolStatus.Enabled));
   }
 
   @runtimeMethod()
@@ -226,6 +239,9 @@ export class XYK extends RuntimeModule<unknown> {
     const amountA = liquidity.mul(reserveA).div(totalSupply);
     const amountB = liquidity.mul(reserveB).div(totalSupply);
 
+    // Boolean describing if the pool is empty after the liquidity removal
+    const emptiedUp = reserveA.equals(amountA); //implies that reserveB equals amountB
+
     assert(
       amountA.greaterThanOrEqual(amountAMin),
       errors.insufficientAAmount(),
@@ -259,7 +275,16 @@ export class XYK extends RuntimeModule<unknown> {
     );
     // Burn sender's lp tokens
     this.balances.burn(lpToken, liquidity);
-    // TODO: Check if pool reserves are empty and delete the pool if so
+
+    this.pools.set(
+      pool,
+      Provable.if(
+        emptiedUp,
+        Field,
+        Field(PoolStatus.Disabled),
+        Field(PoolStatus.Enabled),
+      ),
+    );
   }
 
   public calculateTokenOutAmount(
@@ -360,7 +385,7 @@ export class XYK extends RuntimeModule<unknown> {
       const tokenOut = path[i + 1];
 
       const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
-      const poolExists = this.pools.get(pool).isSome;
+      const poolExists = this.poolExists(tokenIn, tokenOut);
 
       lastTokenOut = Provable.if(poolExists, TokenId, tokenOut, lastTokenOut);
 
@@ -429,7 +454,7 @@ export class XYK extends RuntimeModule<unknown> {
       const tokenOut = path[i];
 
       const pool = PoolKey.fromTokenPair(tokenIn, tokenOut);
-      const poolExists = this.pools.get(pool).isSome;
+      const poolExists = this.poolExists(tokenIn, tokenOut);
 
       const currentAmountOut = Provable.if(
         poolExists,
