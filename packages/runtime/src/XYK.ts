@@ -114,6 +114,22 @@ export class XYK extends RuntimeModule<unknown> {
   }
 
   @runtimeMethod()
+  public enableFeeSetting(fee: UInt64) {
+    // Assert sender is admin / this should be called by governance in the future
+    this.balances.admin.assertIsSenderAdmin();
+    assert(fee.equals(UInt64.zero).not());
+    this.fees.set(fee, Bool(true));
+  }
+
+  @runtimeMethod()
+  public disableFeeSetting(fee: UInt64) {
+    // Assert sender is admin / this should be called by governance in the future
+    this.balances.admin.assertIsSenderAdmin();
+    assert(this.fees.get(fee).isSome);
+    this.fees.set(fee, Bool(false));
+  }
+
+  @runtimeMethod()
   public createPool(
     tokenA: TokenId,
     tokenB: TokenId,
