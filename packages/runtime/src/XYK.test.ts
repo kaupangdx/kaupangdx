@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { TestingAppChain } from "@proto-kit/sdk";
-import { PrivateKey, PublicKey } from "o1js";
+import { PrivateKey, PublicKey, UInt64, Bool } from "o1js";
 import { Balance, Balances, BalancesKey, TokenId } from "./Balances";
 import { LPTokenId, PoolKey, XYK } from "./XYK";
 import { WrappedTokenIdArray } from "./WrappedArrays";
@@ -135,6 +135,47 @@ describe("xyk", () => {
     expect(balanceB?.toBigInt()).toBe(balanceToMint);
     expect(balanceC?.toBigInt()).toBe(balanceToMint);
   });
+
+  describe("settings", () => {
+    const onePercentFee = UInt64.from(100);
+    it("should enable fee setting", async () => {
+      const tx = await appChain.transaction(
+        alice,
+        () => {
+          xyk.enableFeeSetting(
+            onePercentFee
+          );
+        },
+        { nonce },
+      );
+      await tx.sign();
+      await tx.send();
+      const block = await appChain.produceBlock();
+
+      expect(block?.txs[0].status).toBe(true);
+
+      expect((await appChain.query.runtime.XYK.fees.get(onePercentFee))?.toBoolean()).toBe(true);
+    });
+
+    it("should disable fee setting", async () => {
+      const tx = await appChain.transaction(
+        alice,
+        () => {
+          xyk.disableFeeSetting(
+            onePercentFee
+          );
+        },
+        { nonce },
+      );
+      await tx.sign();
+      await tx.send();
+      const block = await appChain.produceBlock();
+
+      expect(block?.txs[0].status).toBe(true);
+
+      expect((await appChain.query.runtime.XYK.fees.get(onePercentFee))?.toBoolean()).toBe(false);
+    })
+  })
 
   describe("pool interactions", () => {
     it("should create an A/B pair", async () => {
